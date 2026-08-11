@@ -6,6 +6,12 @@ import {
   ArrowUpRight,
 } from "lucide-react";
 
+import {
+  FaFacebookF,
+  FaInstagram,
+  FaLinkedinIn,
+} from "react-icons/fa";
+
 const Footer = () => {
   const currentYear = new Date().getFullYear();
 
@@ -14,6 +20,7 @@ const Footer = () => {
       <div className="mx-auto max-w-7xl px-4 py-14 sm:px-6 lg:px-8">
         {/* Main Footer */}
         <div className="grid gap-10 md:grid-cols-2 lg:grid-cols-4">
+
           {/* Brand */}
           <div className="lg:col-span-1">
             <Link
@@ -34,14 +41,14 @@ const Footer = () => {
               Find your game, choose your time, and get playing.
             </p>
 
-            {/* Social */}
+            {/* Social Links */}
             <div className="mt-6 flex items-center gap-2">
               <a
                 href="#"
                 aria-label="Facebook"
                 className="flex h-9 w-9 items-center justify-center rounded-lg border border-gray-800 text-gray-400 transition hover:border-gray-700 hover:bg-gray-900 hover:text-white"
               >
-                <Facebook size={17} />
+                <FaFacebookF size={15} />
               </a>
 
               <a
@@ -49,7 +56,7 @@ const Footer = () => {
                 aria-label="Instagram"
                 className="flex h-9 w-9 items-center justify-center rounded-lg border border-gray-800 text-gray-400 transition hover:border-gray-700 hover:bg-gray-900 hover:text-white"
               >
-                <Instagram size={17} />
+                <FaInstagram size={16} />
               </a>
 
               <a
@@ -57,7 +64,7 @@ const Footer = () => {
                 aria-label="LinkedIn"
                 className="flex h-9 w-9 items-center justify-center rounded-lg border border-gray-800 text-gray-400 transition hover:border-gray-700 hover:bg-gray-900 hover:text-white"
               >
-                <Linkedin size={17} />
+                <FaLinkedinIn size={15} />
               </a>
             </div>
           </div>
@@ -212,6 +219,7 @@ const Footer = () => {
             className="group inline-flex items-center gap-1 text-sm font-medium text-gray-400 transition hover:text-white"
           >
             Find your next game
+
             <ArrowUpRight
               size={15}
               className="transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5"

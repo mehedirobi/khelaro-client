@@ -98,7 +98,7 @@ const Contact = () => {
                     href="tel:+8801000000000"
                     className="mt-1 block text-sm text-gray-200 transition hover:text-green-400"
                   >
-                    +880 1000-000000
+                    +8801336458100
                   </a>
                 </div>
               </div>

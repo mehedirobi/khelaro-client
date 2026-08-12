@@ -7,6 +7,7 @@ import Home from "../components/Home";
 import Turf from "../components/Turf";
 import About from "../pages/About";
 import Contact from "../pages/Contact";
+import TurfDetails from "../pages/TurfDetails";
 
 const router = createBrowserRouter([
   {
@@ -29,6 +30,10 @@ const router = createBrowserRouter([
       {
         path: "/turfs",
         element: <Turf></Turf>,
+      },
+      {
+        path: "turfs/:turfId",
+        element: <TurfDetails />,
       },
       {
         path: "/about",

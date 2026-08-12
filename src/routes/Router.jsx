@@ -4,6 +4,7 @@ import MainLayout from "../layouts/MainLayout";
 import Login from "../pages/Login";
 import Register from "../pages/Register";
 import Home from "../components/Home";
+import Turf from "../components/Turf";
 
 const router = createBrowserRouter([
   {
@@ -22,6 +23,10 @@ const router = createBrowserRouter([
       {
         path: "/register",
         element: <Register></Register>,
+      },
+      {
+        path: "/turfs",
+        element: <Turf></Turf>,
       }
     ]
   },

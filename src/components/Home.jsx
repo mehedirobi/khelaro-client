@@ -1,10 +1,10 @@
-import Hero from "../components/home/Hero";
-import LocationSection from "../components/home/LocationSection";
-import FeaturedTurfs from "../components/home/FeaturedTurfs";
-import HowItWorks from "../components/home/HowItWorks";
-import WhyKhelaro from "../components/home/WhyKhelaro";
-import OwnerCTA from "../components/home/OwnerCTA";
-import FinalCTA from "../components/home/FinalCTA";
+import Hero from "../components/Hero";
+import LocationSection from "../components/LocationSection";
+import FeaturedTurfs from "../components/FeaturedTurfs";
+import HowItWorks from "../components/HowItWorks";
+import WhyKhelaro from "../components/WhyKhelaro";
+import OwnerCTA from "../components/OwnerCTA";
+import FinalCTA from "../components/FinalCTA";
 
 const Home = () => {
   return (

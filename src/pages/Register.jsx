@@ -19,7 +19,7 @@ const Register = () => {
   const handleSubmit = (e) => {
     e.preventDefault();
 
-    // Firebase registration will be added here later
+    // Firebase registration 
     console.log("Register submitted", { role });
   };
 

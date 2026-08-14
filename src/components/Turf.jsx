@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
+import { turfs } from "../data/turfs";
 import {
   Search,
   MapPin,
@@ -11,87 +12,6 @@ import {
   ArrowUpRight,
   Map,
 } from "lucide-react";
-
-const turfData = [
-  {
-    id: "arena-sports-zone",
-    name: "Arena Sports Zone",
-    location: "Mirpur, Dhaka",
-    sport: "Football",
-    rating: 4.8,
-    reviews: 124,
-    price: 1200,
-    image:
-      "https://images.unsplash.com/photo-1579952363873-27f3bade9f55?auto=format&fit=crop&w=900&q=80",
-    features: ["5v5", "Floodlights", "Parking"],
-    available: true,
-  },
-  {
-    id: "uttara-sports-arena",
-    name: "Uttara Sports Arena",
-    location: "Uttara, Dhaka",
-    sport: "Football",
-    rating: 4.7,
-    reviews: 98,
-    price: 1500,
-    image:
-      "https://images.unsplash.com/photo-1553778263-73a83bab9b0c?auto=format&fit=crop&w=900&q=80",
-    features: ["7v7", "Floodlights", "Changing Room"],
-    available: true,
-  },
-  {
-    id: "playground-360",
-    name: "Playground 360",
-    location: "Mohammadpur, Dhaka",
-    sport: "Football",
-    rating: 4.9,
-    reviews: 156,
-    price: 1300,
-    image:
-      "https://images.unsplash.com/photo-1526232761682-d26e03ac148e?auto=format&fit=crop&w=900&q=80",
-    features: ["5v5", "Parking", "Cafeteria"],
-    available: true,
-  },
-  {
-    id: "dhaka-cricket-arena",
-    name: "Dhaka Cricket Arena",
-    location: "Badda, Dhaka",
-    sport: "Cricket",
-    rating: 4.6,
-    reviews: 76,
-    price: 1800,
-    image:
-      "https://images.unsplash.com/photo-1531415074968-036ba1b575da?auto=format&fit=crop&w=900&q=80",
-    features: ["Box Cricket", "Floodlights", "Parking"],
-    available: true,
-  },
-  {
-    id: "bashundhara-play-zone",
-    name: "Bashundhara Play Zone",
-    location: "Bashundhara, Dhaka",
-    sport: "Football",
-    rating: 4.8,
-    reviews: 112,
-    price: 1600,
-    image:
-      "https://images.unsplash.com/photo-1517466787929-bc90951d0974?auto=format&fit=crop&w=900&q=80",
-    features: ["7v7", "Premium Turf", "Parking"],
-    available: true,
-  },
-  {
-    id: "dhanmondi-sports-hub",
-    name: "Dhanmondi Sports Hub",
-    location: "Dhanmondi, Dhaka",
-    sport: "Badminton",
-    rating: 4.7,
-    reviews: 89,
-    price: 800,
-    image:
-      "https://images.unsplash.com/photo-1626224583764-f87db24ac4ea?auto=format&fit=crop&w=900&q=80",
-    features: ["Indoor", "AC", "Changing Room"],
-    available: true,
-  },
-];
 
 const locations = [
   "All locations",
@@ -113,31 +33,35 @@ const Turfs = () => {
   const [showFilters, setShowFilters] = useState(false);
 
   const filteredTurfs = useMemo(() => {
-    let result = [...turfData];
+    let result = [...turfs];
 
+    // Search
     if (search.trim()) {
-      const query = search.toLowerCase();
+      const query = search.toLowerCase().trim();
 
       result = result.filter(
         (turf) =>
           turf.name.toLowerCase().includes(query) ||
           turf.location.toLowerCase().includes(query) ||
+          turf.area.toLowerCase().includes(query) ||
           turf.sport.toLowerCase().includes(query)
       );
     }
 
+    // Location filter
     if (location !== "All locations") {
-      result = result.filter((turf) =>
-        turf.location
-          .toLowerCase()
-          .includes(location.toLowerCase())
+      result = result.filter(
+        (turf) =>
+          turf.area.toLowerCase() === location.toLowerCase()
       );
     }
 
+    // Sport filter
     if (sport !== "All sports") {
       result = result.filter((turf) => turf.sport === sport);
     }
 
+    // Sorting
     if (sort === "price-low") {
       result.sort((a, b) => a.price - b.price);
     }
@@ -161,7 +85,7 @@ const Turfs = () => {
   };
 
   const hasActiveFilters =
-    search ||
+    search.trim() ||
     location !== "All locations" ||
     sport !== "All sports";
 
@@ -204,7 +128,7 @@ const Turfs = () => {
 
             <button
               type="button"
-              onClick={() => setShowFilters(!showFilters)}
+              onClick={() => setShowFilters((prev) => !prev)}
               className="inline-flex h-12 items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-5 text-sm font-medium text-gray-700 transition hover:border-gray-300 lg:hidden"
             >
               <SlidersHorizontal size={18} />
@@ -233,7 +157,7 @@ const Turfs = () => {
                   <button
                     type="button"
                     onClick={clearFilters}
-                    className="text-xs font-medium text-green-600 hover:text-green-700"
+                    className="text-xs font-medium text-green-600 transition hover:text-green-700"
                   >
                     Clear all
                   </button>
@@ -300,7 +224,7 @@ const Turfs = () => {
 
           {/* Results */}
           <div>
-            {/* Result header */}
+            {/* Result Header */}
             <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <p className="text-sm text-gray-500">
@@ -324,17 +248,20 @@ const Turfs = () => {
                     id="sort"
                     value={sort}
                     onChange={(e) => setSort(e.target.value)}
-                    className="h-10 appearance-none rounded-lg border border-gray-200 bg-white pl-3 pr-9 text-sm text-gray-700 outline-none focus:border-green-500"
+                    className="h-10 appearance-none rounded-lg border border-gray-200 bg-white pl-3 pr-9 text-sm text-gray-700 outline-none transition focus:border-green-500"
                   >
                     <option value="recommended">
                       Recommended
                     </option>
+
                     <option value="rating">
                       Highest rated
                     </option>
+
                     <option value="price-low">
                       Price: Low to high
                     </option>
+
                     <option value="price-high">
                       Price: High to low
                     </option>
@@ -356,7 +283,7 @@ const Turfs = () => {
               </div>
             </div>
 
-            {/* Active filters */}
+            {/* Active Filters */}
             {hasActiveFilters && (
               <div className="mb-6 flex flex-wrap items-center gap-2">
                 {search && (
@@ -373,7 +300,9 @@ const Turfs = () => {
                 {location !== "All locations" && (
                   <button
                     type="button"
-                    onClick={() => setLocation("All locations")}
+                    onClick={() =>
+                      setLocation("All locations")
+                    }
                     className="inline-flex items-center gap-1.5 rounded-full bg-green-50 px-3 py-1.5 text-xs font-medium text-green-700"
                   >
                     {location}
@@ -394,80 +323,95 @@ const Turfs = () => {
               </div>
             )}
 
-            {/* Cards */}
+            {/* Turf Cards */}
             {filteredTurfs.length > 0 ? (
               <div className="grid gap-5 md:grid-cols-2">
                 {filteredTurfs.map((turf) => (
                   <article
                     key={turf.id}
-                    className="group overflow-hidden rounded-2xl border border-gray-200 bg-white transition hover:-translate-y-1 hover:shadow-xl hover:shadow-gray-100"
+                    className="group overflow-hidden rounded-2xl border border-gray-200 bg-white transition duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-gray-100"
                   >
+                    {/* Image */}
                     <div className="relative aspect-[16/10] overflow-hidden bg-gray-100">
                       <img
                         src={turf.image}
                         alt={turf.name}
+                        loading="lazy"
                         className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
                       />
 
+                      {/* Overlay */}
                       <div className="absolute inset-x-0 top-0 flex items-start justify-between p-4">
-                        <span className="rounded-full bg-white/95 px-3 py-1.5 text-xs font-semibold text-gray-800">
+                        <span className="rounded-full bg-white/95 px-3 py-1.5 text-xs font-semibold text-gray-800 shadow-sm">
                           {turf.sport}
                         </span>
 
                         <button
                           type="button"
-                          aria-label={`Favorite ${turf.name}`}
+                          aria-label={`Add ${turf.name} to favorites`}
                           className="flex h-9 w-9 items-center justify-center rounded-full bg-white/95 text-gray-600 shadow-sm transition hover:text-red-500"
                         >
                           <Heart size={17} />
                         </button>
                       </div>
 
-                      {turf.available && (
-                        <div className="absolute bottom-4 left-4">
-                          <span className="rounded-full bg-green-600 px-3 py-1.5 text-xs font-semibold text-white">
-                            Available today
-                          </span>
-                        </div>
-                      )}
+                      {/* Availability */}
+                      <div className="absolute bottom-4 left-4">
+                        <span className="rounded-full bg-green-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm">
+                          Available
+                        </span>
+                      </div>
                     </div>
 
+                    {/* Content */}
                     <div className="p-5">
                       <div className="flex items-start justify-between gap-3">
-                        <div>
-                          <h3 className="font-semibold text-gray-900">
+                        <div className="min-w-0">
+                          <h3 className="truncate font-semibold text-gray-900">
                             {turf.name}
                           </h3>
 
                           <div className="mt-2 flex items-center gap-1.5 text-xs text-gray-500">
-                            <MapPin size={14} />
-                            {turf.location}
+                            <MapPin
+                              size={14}
+                              className="shrink-0"
+                            />
+
+                            <span>{turf.location}</span>
                           </div>
                         </div>
 
+                        {/* Rating */}
                         <div className="flex shrink-0 items-center gap-1 rounded-lg bg-amber-50 px-2 py-1 text-xs font-semibold text-amber-700">
                           <Star
                             size={13}
                             fill="currentColor"
                           />
+
                           {turf.rating}
                         </div>
                       </div>
 
-                      <div className="mt-3 flex flex-wrap gap-2">
-                        {turf.features.map((feature) => (
-                          <span
-                            key={feature}
-                            className="rounded-md bg-gray-50 px-2 py-1 text-[11px] text-gray-500"
-                          >
-                            {feature}
-                          </span>
-                        ))}
+                      {/* Turf Info */}
+                      <div className="mt-4 flex flex-wrap gap-2">
+                        <span className="rounded-md bg-gray-50 px-2 py-1 text-[11px] text-gray-500">
+                          {turf.size}
+                        </span>
+
+                        <span className="rounded-md bg-gray-50 px-2 py-1 text-[11px] text-gray-500">
+                          {turf.surface}
+                        </span>
+
+                        <span className="rounded-md bg-gray-50 px-2 py-1 text-[11px] text-gray-500">
+                          Floodlights
+                        </span>
                       </div>
 
+                      {/* Divider */}
                       <div className="my-4 border-t border-gray-100" />
 
-                      <div className="flex items-center justify-between">
+                      {/* Bottom */}
+                      <div className="flex items-center justify-between gap-4">
                         <div>
                           <p className="text-xs text-gray-400">
                             Starting from
@@ -486,6 +430,7 @@ const Turfs = () => {
                           className="inline-flex items-center gap-1.5 rounded-lg bg-gray-900 px-4 py-2.5 text-xs font-semibold text-white transition hover:bg-green-600"
                         >
                           View details
+
                           <ArrowUpRight size={14} />
                         </Link>
                       </div>
@@ -494,10 +439,13 @@ const Turfs = () => {
                 ))}
               </div>
             ) : (
-              /* Empty state */
+              /* Empty State */
               <div className="rounded-2xl border border-gray-200 bg-white px-6 py-16 text-center">
                 <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-gray-100">
-                  <Search size={24} className="text-gray-400" />
+                  <Search
+                    size={24}
+                    className="text-gray-400"
+                  />
                 </div>
 
                 <h3 className="mt-5 font-semibold text-gray-900">
@@ -505,8 +453,8 @@ const Turfs = () => {
                 </h3>
 
                 <p className="mx-auto mt-2 max-w-sm text-sm leading-6 text-gray-500">
-                  Try changing your search or removing some filters
-                  to find more turfs.
+                  Try changing your search or removing some
+                  filters to find more turfs.
                 </p>
 
                 <button

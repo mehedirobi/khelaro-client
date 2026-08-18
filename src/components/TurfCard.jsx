@@ -17,7 +17,7 @@ const TurfCard = ({ turf }) => {
           className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
         />
 
-        {/* Overlay */}
+        {/* Overlay function*/}
         <div className="absolute inset-x-0 top-0 flex items-start justify-between p-4">
           <span className="rounded-full bg-white/95 px-3 py-1.5 text-xs font-semibold text-gray-800 shadow-sm">
             {turf.sport}

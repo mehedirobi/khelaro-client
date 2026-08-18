@@ -54,7 +54,7 @@ const WhyKhelaro = () => {
             </p>
           </div>
 
-          {/* Features */}
+          {/* Features section */}
           <div className="grid gap-4 sm:grid-cols-2">
             {features.map((feature) => {
               const Icon = feature.icon;

@@ -11,6 +11,7 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import { turfs } from "../data/turfs";
+import BookingSection from "../pages/BookingSection";
 
 const TurfDetails = () => {
   const { turfId } = useParams();
@@ -227,9 +228,12 @@ const TurfDetails = () => {
                       Availability
                     </p>
 
-                    <p className="text-sm font-medium text-gray-900">
-                      Check available slots
-                    </p>
+                    <Link
+  to={`/turfs/${turf.id}/slots`}
+  className="text-sm font-medium text-gray-900 transition hover:text-green-600"
+>
+  Check available slots
+</Link>
                   </div>
                 </div>
 

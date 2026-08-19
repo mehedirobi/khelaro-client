@@ -1,6 +1,5 @@
 import Hero from "../components/Hero";
 import LocationSection from "../components/LocationSection";
-import FeaturedTurfs from "../components/FeaturedTurfs";
 import HowItWorks from "../components/HowItWorks";
 import WhyKhelaro from "../components/WhyKhelaro";
 import OwnerCTA from "../components/OwnerCTA";
@@ -11,7 +10,7 @@ const Home = () => {
     <>
       <Hero />
       <LocationSection />
-      <FeaturedTurfs />
+      
       <HowItWorks />
       <WhyKhelaro />
       <OwnerCTA />

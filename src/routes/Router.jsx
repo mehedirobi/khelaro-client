@@ -11,6 +11,9 @@ import About from "../pages/About";
 import Contact from "../pages/Contact";
 import TurfDetails from "../pages/TurfDetails";
 import BookingSection from "../pages/BookingSection";
+import BookingConfirmation from "../pages/BookingConfirmation";
+import Payment from "../pages/Payment";
+import BookingSuccess from "../pages/BookingSuccess";
 
 const router = createBrowserRouter([
   {
@@ -49,6 +52,14 @@ const router = createBrowserRouter([
       {
         path: "/booking/:id",
         element: <BookingConfirmation />,
+      },
+      {
+        path: "/payment/:id",
+        element: <Payment />,
+      },
+      {
+        path: "/booking-success/:id",
+        element: <BookingSuccess />,
       },
 
       {

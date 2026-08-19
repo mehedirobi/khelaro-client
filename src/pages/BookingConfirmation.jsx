@@ -24,9 +24,7 @@ const BookingConfirmation = () => {
     return (
       <main className="flex min-h-[70vh] items-center justify-center bg-gray-50 px-4">
         <div className="text-center">
-          <h1 className="text-2xl font-bold text-gray-900">
-            Turf not found
-          </h1>
+          <h1 className="text-2xl font-bold text-gray-900">Turf not found</h1>
 
           <p className="mt-2 text-sm text-gray-500">
             The turf you are trying to book does not exist.
@@ -73,7 +71,7 @@ const BookingConfirmation = () => {
       day: "numeric",
       month: "long",
       year: "numeric",
-    }
+    },
   );
 
   const serviceFee = 50;
@@ -165,9 +163,7 @@ const BookingConfirmation = () => {
                   </div>
 
                   <div>
-                    <p className="text-xs text-gray-400">
-                      Booking date
-                    </p>
+                    <p className="text-xs text-gray-400">Booking date</p>
 
                     <p className="mt-1 text-sm font-semibold text-gray-900">
                       {formattedDate}
@@ -182,9 +178,7 @@ const BookingConfirmation = () => {
                   </div>
 
                   <div>
-                    <p className="text-xs text-gray-400">
-                      Selected time
-                    </p>
+                    <p className="text-xs text-gray-400">Selected time</p>
 
                     <p className="mt-1 text-sm font-semibold text-gray-900">
                       {slot}
@@ -197,10 +191,7 @@ const BookingConfirmation = () => {
             {/* Important Information */}
             <div className="rounded-2xl border border-green-100 bg-green-50 p-5">
               <div className="flex gap-3">
-                <ShieldCheck
-                  size={21}
-                  className="shrink-0 text-green-600"
-                />
+                <ShieldCheck size={21} className="shrink-0 text-green-600" />
 
                 <div>
                   <h3 className="text-sm font-semibold text-gray-900">
@@ -208,8 +199,8 @@ const BookingConfirmation = () => {
                   </h3>
 
                   <p className="mt-1 text-sm leading-6 text-gray-600">
-                    Your booking will be confirmed after successful
-                    payment. Please arrive on time for your selected slot.
+                    Your booking will be confirmed after successful payment.
+                    Please arrive on time for your selected slot.
                   </p>
                 </div>
               </div>
@@ -225,9 +216,7 @@ const BookingConfirmation = () => {
 
               <div className="mt-6 space-y-4 text-sm">
                 <div className="flex items-center justify-between">
-                  <span className="text-gray-500">
-                    Turf booking
-                  </span>
+                  <span className="text-gray-500">Turf booking</span>
 
                   <span className="font-medium text-gray-900">
                     ৳{turf.price.toLocaleString()}
@@ -235,9 +224,7 @@ const BookingConfirmation = () => {
                 </div>
 
                 <div className="flex items-center justify-between">
-                  <span className="text-gray-500">
-                    Service fee
-                  </span>
+                  <span className="text-gray-500">Service fee</span>
 
                   <span className="font-medium text-gray-900">
                     ৳{serviceFee}
@@ -246,9 +233,7 @@ const BookingConfirmation = () => {
 
                 <div className="border-t border-gray-100 pt-4">
                   <div className="flex items-center justify-between">
-                    <span className="font-semibold text-gray-900">
-                      Total
-                    </span>
+                    <span className="font-semibold text-gray-900">Total</span>
 
                     <span className="text-xl font-bold text-gray-900">
                       ৳{totalPrice.toLocaleString()}
@@ -257,17 +242,16 @@ const BookingConfirmation = () => {
                 </div>
               </div>
 
-              <button
-                type="button"
+              <Link
+                to={`/payment/${turf.id}?date=${date}&slot=${encodeURIComponent(slot)}`}
                 className="mt-7 flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-green-600 text-sm font-semibold text-white transition hover:bg-green-700"
               >
                 <CreditCard size={18} />
                 Proceed to Payment
-              </button>
+              </Link>
 
               <p className="mt-4 text-center text-xs leading-5 text-gray-400">
-                By continuing, you agree to our booking and cancellation
-                policy.
+                By continuing, you agree to our booking and cancellation policy.
               </p>
             </div>
           </aside>

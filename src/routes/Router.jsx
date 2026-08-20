@@ -15,6 +15,7 @@ import BookingConfirmation from "../pages/BookingConfirmation";
 import Payment from "../pages/Payment";
 import BookingSuccess from "../pages/BookingSuccess";
 
+
 const router = createBrowserRouter([
   {
     path: "/",

@@ -32,7 +32,7 @@ const TurfCard = ({ turf }) => {
           </button>
         </div>
 
-        {/* Availability */}
+        {/* Availability function */}
         <div className="absolute bottom-4 left-4">
           <span className="rounded-full bg-gray-950/85 px-3 py-1.5 text-xs font-medium text-white">
             Available today

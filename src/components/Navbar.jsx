@@ -3,10 +3,9 @@ import { Link, NavLink } from "react-router-dom";
 import {
   Menu,
   X,
-  MapPin,
   Heart,
   UserRound,
-  ChevronDown,
+  LayoutDashboard,
 } from "lucide-react";
 
 const Navbar = () => {
@@ -59,15 +58,26 @@ const Navbar = () => {
         </nav>
 
         {/* Desktop Actions */}
-        <div className="hidden items-center gap-3 lg:flex">
-          <button
-            type="button"
-            className="flex h-10 w-10 items-center justify-center rounded-xl text-gray-600 transition hover:bg-gray-100 hover:text-gray-900"
-            aria-label="Favorites"
+        <div className="hidden items-center gap-2 lg:flex">
+          {/* Wishlist */}
+          <Link
+            to="/dashboard/wishlist"
+            className="flex h-10 w-10 items-center justify-center rounded-xl text-gray-600 transition hover:bg-red-50 hover:text-red-500"
+            aria-label="Wishlist"
           >
             <Heart size={19} strokeWidth={1.8} />
-          </button>
+          </Link>
 
+          {/* Dashboard */}
+          <Link
+            to="/dashboard"
+            className="flex h-10 w-10 items-center justify-center rounded-xl text-gray-600 transition hover:bg-green-50 hover:text-green-600"
+            aria-label="Dashboard"
+          >
+            <LayoutDashboard size={19} strokeWidth={1.8} />
+          </Link>
+
+          {/* Login */}
           <Link
             to="/login"
             className="flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold text-gray-700 transition hover:bg-gray-100"
@@ -76,6 +86,7 @@ const Navbar = () => {
             Login
           </Link>
 
+          {/* Register */}
           <Link
             to="/register"
             className="rounded-xl bg-green-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-green-700"
@@ -117,8 +128,35 @@ const Navbar = () => {
                   {link.name}
                 </NavLink>
               ))}
+
+              {/* Dashboard */}
+              <NavLink
+                to="/dashboard"
+                onClick={closeMenu}
+                className={({ isActive }) =>
+                  `mt-2 flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition ${
+                    isActive
+                      ? "bg-green-50 text-green-600"
+                      : "text-gray-700 hover:bg-gray-50"
+                  }`
+                }
+              >
+                <LayoutDashboard size={18} />
+                Dashboard
+              </NavLink>
+
+              {/* Wishlist */}
+              <NavLink
+                to="/dashboard/wishlist"
+                onClick={closeMenu}
+                className="flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
+              >
+                <Heart size={18} />
+                Wishlist
+              </NavLink>
             </nav>
 
+            {/* Auth Buttons */}
             <div className="mt-4 grid grid-cols-2 gap-3 border-t border-gray-100 pt-4">
               <Link
                 to="/login"

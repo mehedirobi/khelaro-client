@@ -23,6 +23,8 @@ import MyBookings from "../dashboard/MyBookings";
 import Wishlist from "../dashboard/Wishlist";
 import Profile from "../dashboard/Profile";
 
+import NotFound from "../pages/NotFound";
+
 const router = createBrowserRouter([
   {
     path: "/",
@@ -74,6 +76,10 @@ const router = createBrowserRouter([
       },
     ],
   },
+  {
+  path: "*",
+  element: <NotFound />,
+},
 
   // Dashboard Layout
   {

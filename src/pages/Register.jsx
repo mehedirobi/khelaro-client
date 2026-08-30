@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { useContext } from "react";
 import {
   Eye,
   EyeOff,
@@ -9,31 +10,28 @@ import {
   Phone,
   ArrowRight,
   CheckCircle2,
+  Loader2,
+  AlertCircle,
 } from "lucide-react";
 
-import {
-  createUserWithEmailAndPassword,
-  updateProfile,
-} from "firebase/auth";
-
-import { auth } from "../firebase/firebase.config";
+import { AuthContext } from "../contexts/AuthProvider";
 
 const Register = () => {
   const navigate = useNavigate();
 
+  const { register, loading } = useContext(AuthContext);
+
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
   const [role, setRole] = useState("customer");
 
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
 
   const handleSubmit = async (e) => {
     e.preventDefault();
 
     setError("");
-    setSuccess("");
 
     const form = e.target;
 
@@ -56,26 +54,24 @@ const Register = () => {
     }
 
     try {
-      setLoading(true);
-
-      // Frontend role -> Backend role
+      // Customer -> user
+      // Turf Owner -> owner
       const userRole = role === "customer" ? "user" : "owner";
 
-      // 1. Create Firebase account
-      const userCredential = await createUserWithEmailAndPassword(
-        auth,
+      // --------------------------------
+      // 1. Firebase Registration
+      // --------------------------------
+      const firebaseUser = await register(
+        name,
         email,
         password
       );
 
-      const firebaseUser = userCredential.user;
+      console.log("Firebase Registration Successful:", firebaseUser);
 
-      // 2. Update Firebase profile
-      await updateProfile(firebaseUser, {
-        displayName: name,
-      });
-
-      // 3. Prepare MongoDB user data
+      // --------------------------------
+      // 2. MongoDB User Data
+      // --------------------------------
       const userInfo = {
         uid: firebaseUser.uid,
         name,
@@ -84,74 +80,95 @@ const Register = () => {
         role: userRole,
       };
 
-      // 4. Save user to MongoDB
-      const response = await fetch("http://localhost:3000/users", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(userInfo),
-      });
+      // --------------------------------
+      // 3. Save User to MongoDB
+      // --------------------------------
+      const response = await fetch(
+        "http://localhost:3000/users",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(userInfo),
+        }
+      );
 
       const data = await response.json();
 
       if (!response.ok) {
         throw new Error(
-          data.message || "Failed to save user information."
+          data.message ||
+            "Failed to save user information."
         );
       }
 
-      // 5. Success
-      setSuccess("Account created successfully!");
+      console.log("MongoDB User Created:", data);
 
-      // 6. Redirect
+      // --------------------------------
+      // 4. Final Success
+      // --------------------------------
+      // Firebase success toast already comes
+      // from AuthProvider.
+
+      // Small delay so user can see success toast
       setTimeout(() => {
-        navigate("/");
-      }, 1200);
+        navigate(
+          userRole === "owner"
+            ? "/owner-dashboard"
+            : "/dashboard"
+        );
+      }, 1000);
     } catch (error) {
       console.error("Registration error:", error);
 
-      let errorMessage = "Registration failed. Please try again.";
+      // AuthProvider already handles Firebase errors
+      // so don't show duplicate toast here.
 
-      switch (error.code) {
-        case "auth/email-already-in-use":
-          errorMessage = "This email is already registered.";
-          break;
-
-        case "auth/invalid-email":
-          errorMessage = "Please enter a valid email address.";
-          break;
-
-        case "auth/weak-password":
-          errorMessage = "Password must be at least 6 characters.";
-          break;
-
-        case "auth/network-request-failed":
-          errorMessage =
-            "Network error. Please check your internet connection.";
-          break;
-
-        default:
-          if (error.message) {
-            errorMessage = error.message;
-          }
+      if (
+        error.message ===
+        "Failed to save user information."
+      ) {
+        setError(
+          "Account created, but failed to save your profile. Please contact support."
+        );
+      } else if (
+        error.message?.includes(
+          "Failed to save user information"
+        )
+      ) {
+        setError(error.message);
+      } else if (
+        error.message?.includes(
+          "NetworkError"
+        )
+      ) {
+        setError(
+          "Cannot connect to server. Please make sure the backend is running."
+        );
       }
-
-      setError(errorMessage);
-    } finally {
-      setLoading(false);
     }
   };
 
   return (
     <div className="min-h-[calc(100vh-72px)] bg-gray-50">
       <div className="mx-auto flex min-h-[calc(100vh-72px)] max-w-7xl items-center justify-center px-4 py-10 sm:px-6 lg:px-8">
+
         <div className="grid w-full max-w-5xl overflow-hidden rounded-3xl border border-gray-200 bg-white shadow-sm lg:grid-cols-2">
 
-          {/* Left - Branding */}
+          {/* =========================
+              LEFT - BRANDING
+          ========================== */}
+
           <div className="relative hidden overflow-hidden bg-gray-950 p-10 lg:flex lg:flex-col lg:justify-between">
+
             <div className="relative z-10">
-              <Link to="/" className="inline-flex items-center gap-2">
+
+              {/* Logo */}
+              <Link
+                to="/"
+                className="inline-flex items-center gap-2"
+              >
                 <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-green-600 text-lg font-bold text-white">
                   K
                 </div>
@@ -161,7 +178,9 @@ const Register = () => {
                 </span>
               </Link>
 
+              {/* Content */}
               <div className="mt-24 max-w-md">
+
                 <p className="mb-4 text-sm font-semibold uppercase tracking-wider text-green-400">
                   Built for the game
                 </p>
@@ -169,41 +188,62 @@ const Register = () => {
                 <h1 className="text-4xl font-bold leading-tight tracking-tight text-white">
                   Find your turf.
                   <br />
+
                   <span className="text-green-500">
                     Book your game.
                   </span>
                 </h1>
 
                 <p className="mt-5 text-base leading-7 text-gray-400">
-                  Join Khelaro and make turf booking around Dhaka
-                  simple, fast, and reliable.
+                  Join Khelaro and make turf booking
+                  around Dhaka simple, fast, and reliable.
                 </p>
+
               </div>
             </div>
 
+            {/* Features */}
             <div className="relative z-10 space-y-3 border-t border-gray-800 pt-6">
+
               <div className="flex items-center gap-2 text-sm text-gray-400">
-                <CheckCircle2 size={17} className="text-green-500" />
+                <CheckCircle2
+                  size={17}
+                  className="text-green-500"
+                />
                 Discover nearby turfs
               </div>
 
               <div className="flex items-center gap-2 text-sm text-gray-400">
-                <CheckCircle2 size={17} className="text-green-500" />
+                <CheckCircle2
+                  size={17}
+                  className="text-green-500"
+                />
                 Check available slots
               </div>
 
               <div className="flex items-center gap-2 text-sm text-gray-400">
-                <CheckCircle2 size={17} className="text-green-500" />
+                <CheckCircle2
+                  size={17}
+                  className="text-green-500"
+                />
                 Book with confidence
               </div>
+
             </div>
 
+            {/* Decorative */}
             <div className="absolute -right-24 -top-24 h-72 w-72 rounded-full bg-green-600/10 blur-3xl" />
+
             <div className="absolute -bottom-32 -left-20 h-80 w-80 rounded-full bg-green-500/10 blur-3xl" />
+
           </div>
 
-          {/* Right - Register Form */}
+          {/* =========================
+              RIGHT - REGISTER FORM
+          ========================== */}
+
           <div className="flex items-center p-6 sm:p-10 lg:p-12">
+
             <div className="mx-auto w-full max-w-md">
 
               {/* Mobile Logo */}
@@ -220,7 +260,9 @@ const Register = () => {
                 </span>
               </Link>
 
+              {/* Heading */}
               <div>
+
                 <h2 className="text-3xl font-bold tracking-tight text-gray-900">
                   Create your account
                 </h2>
@@ -228,35 +270,50 @@ const Register = () => {
                 <p className="mt-2 text-sm text-gray-500">
                   Join Khelaro and start booking your next game.
                 </p>
+
               </div>
 
-              {/* Error Message */}
+              {/* Error */}
               {error && (
-                <div className="mt-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">
-                  {error}
+                <div className="mt-6 flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 p-4">
+
+                  <AlertCircle
+                    size={18}
+                    className="mt-0.5 shrink-0 text-red-500"
+                  />
+
+                  <p className="text-sm leading-5 text-red-600">
+                    {error}
+                  </p>
+
                 </div>
               )}
 
-              {/* Success Message */}
-              {success && (
-                <div className="mt-5 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-600">
-                  {success}
-                </div>
-              )}
+              {/* =========================
+                  FORM
+              ========================== */}
 
-              <form onSubmit={handleSubmit} className="mt-7 space-y-4">
+              <form
+                onSubmit={handleSubmit}
+                className="mt-7 space-y-4"
+              >
 
                 {/* Account Type */}
                 <div>
+
                   <label className="mb-2 block text-sm font-medium text-gray-700">
                     Account type
                   </label>
 
                   <div className="grid grid-cols-2 gap-3">
+
+                    {/* Customer */}
                     <button
                       type="button"
                       disabled={loading}
-                      onClick={() => setRole("customer")}
+                      onClick={() =>
+                        setRole("customer")
+                      }
                       className={`rounded-xl border px-4 py-3 text-left transition ${
                         role === "customer"
                           ? "border-green-500 bg-green-50 ring-2 ring-green-500/10"
@@ -272,10 +329,13 @@ const Register = () => {
                       </p>
                     </button>
 
+                    {/* Owner */}
                     <button
                       type="button"
                       disabled={loading}
-                      onClick={() => setRole("owner")}
+                      onClick={() =>
+                        setRole("owner")
+                      }
                       className={`rounded-xl border px-4 py-3 text-left transition ${
                         role === "owner"
                           ? "border-green-500 bg-green-50 ring-2 ring-green-500/10"
@@ -290,11 +350,13 @@ const Register = () => {
                         Manage turfs
                       </p>
                     </button>
+
                   </div>
                 </div>
 
                 {/* Name */}
                 <div>
+
                   <label
                     htmlFor="name"
                     className="mb-2 block text-sm font-medium text-gray-700"
@@ -303,6 +365,7 @@ const Register = () => {
                   </label>
 
                   <div className="relative">
+
                     <UserRound
                       size={18}
                       className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400"
@@ -318,11 +381,13 @@ const Register = () => {
                       disabled={loading}
                       className="h-12 w-full rounded-xl border border-gray-200 pl-11 pr-4 text-sm outline-none transition placeholder:text-gray-400 focus:border-green-500 focus:ring-4 focus:ring-green-500/10 disabled:bg-gray-50"
                     />
+
                   </div>
                 </div>
 
                 {/* Email */}
                 <div>
+
                   <label
                     htmlFor="email"
                     className="mb-2 block text-sm font-medium text-gray-700"
@@ -331,6 +396,7 @@ const Register = () => {
                   </label>
 
                   <div className="relative">
+
                     <Mail
                       size={18}
                       className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400"
@@ -346,11 +412,13 @@ const Register = () => {
                       disabled={loading}
                       className="h-12 w-full rounded-xl border border-gray-200 pl-11 pr-4 text-sm outline-none transition placeholder:text-gray-400 focus:border-green-500 focus:ring-4 focus:ring-green-500/10 disabled:bg-gray-50"
                     />
+
                   </div>
                 </div>
 
                 {/* Phone */}
                 <div>
+
                   <label
                     htmlFor="phone"
                     className="mb-2 block text-sm font-medium text-gray-700"
@@ -359,6 +427,7 @@ const Register = () => {
                   </label>
 
                   <div className="relative">
+
                     <Phone
                       size={18}
                       className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400"
@@ -373,11 +442,13 @@ const Register = () => {
                       disabled={loading}
                       className="h-12 w-full rounded-xl border border-gray-200 pl-11 pr-4 text-sm outline-none transition placeholder:text-gray-400 focus:border-green-500 focus:ring-4 focus:ring-green-500/10 disabled:bg-gray-50"
                     />
+
                   </div>
                 </div>
 
                 {/* Password */}
                 <div>
+
                   <label
                     htmlFor="password"
                     className="mb-2 block text-sm font-medium text-gray-700"
@@ -386,6 +457,7 @@ const Register = () => {
                   </label>
 
                   <div className="relative">
+
                     <Lock
                       size={18}
                       className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400"
@@ -394,7 +466,11 @@ const Register = () => {
                     <input
                       id="password"
                       name="password"
-                      type={showPassword ? "text" : "password"}
+                      type={
+                        showPassword
+                          ? "text"
+                          : "password"
+                      }
                       autoComplete="new-password"
                       placeholder="Create a password"
                       required
@@ -406,9 +482,11 @@ const Register = () => {
                       type="button"
                       disabled={loading}
                       onClick={() =>
-                        setShowPassword((prev) => !prev)
+                        setShowPassword(
+                          (prev) => !prev
+                        )
                       }
-                      className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700"
+                      className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 transition hover:text-gray-700"
                       aria-label={
                         showPassword
                           ? "Hide password"
@@ -421,11 +499,13 @@ const Register = () => {
                         <Eye size={18} />
                       )}
                     </button>
+
                   </div>
                 </div>
 
                 {/* Confirm Password */}
                 <div>
+
                   <label
                     htmlFor="confirmPassword"
                     className="mb-2 block text-sm font-medium text-gray-700"
@@ -434,6 +514,7 @@ const Register = () => {
                   </label>
 
                   <div className="relative">
+
                     <Lock
                       size={18}
                       className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400"
@@ -462,7 +543,7 @@ const Register = () => {
                           (prev) => !prev
                         )
                       }
-                      className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700"
+                      className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 transition hover:text-gray-700"
                       aria-label={
                         showConfirmPassword
                           ? "Hide password"
@@ -475,11 +556,13 @@ const Register = () => {
                         <Eye size={18} />
                       )}
                     </button>
+
                   </div>
                 </div>
 
                 {/* Terms */}
                 <div className="flex items-start gap-2 pt-1">
+
                   <input
                     id="terms"
                     type="checkbox"
@@ -493,13 +576,16 @@ const Register = () => {
                     className="text-xs leading-5 text-gray-500"
                   >
                     I agree to Khelaro's{" "}
+
                     <Link
                       to="/terms"
                       className="font-medium text-green-600 hover:text-green-700"
                     >
                       Terms & Conditions
                     </Link>{" "}
+
                     and{" "}
+
                     <Link
                       to="/privacy"
                       className="font-medium text-green-600 hover:text-green-700"
@@ -508,6 +594,7 @@ const Register = () => {
                     </Link>
                     .
                   </label>
+
                 </div>
 
                 {/* Submit */}
@@ -516,9 +603,14 @@ const Register = () => {
                   disabled={loading}
                   className="group mt-2 flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-green-600 text-sm font-semibold text-white transition hover:bg-green-700 focus:outline-none focus:ring-4 focus:ring-green-500/20 disabled:cursor-not-allowed disabled:opacity-70"
                 >
+
                   {loading ? (
                     <>
-                      <span className="h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                      <Loader2
+                        size={18}
+                        className="animate-spin"
+                      />
+
                       Creating account...
                     </>
                   ) : (
@@ -531,18 +623,25 @@ const Register = () => {
                       />
                     </>
                   )}
+
                 </button>
+
               </form>
 
+              {/* Login */}
               <p className="mt-7 text-center text-sm text-gray-500">
+
                 Already have an account?{" "}
+
                 <Link
                   to="/login"
                   className="font-semibold text-green-600 hover:text-green-700"
                 >
                   Sign in
                 </Link>
+
               </p>
+
             </div>
           </div>
         </div>

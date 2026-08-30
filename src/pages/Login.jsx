@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import {
   Eye,
   EyeOff,
@@ -7,16 +7,133 @@ import {
   Lock,
   ArrowRight,
   CheckCircle2,
+  Loader2,
+  AlertCircle,
 } from "lucide-react";
 
+import { signInWithEmailAndPassword } from "firebase/auth";
+import { auth } from "../firebase/firebase.config";
+
 const Login = () => {
+  const navigate = useNavigate();
+
   const [showPassword, setShowPassword] = useState(false);
 
-  const handleSubmit = (e) => {
+  const [formData, setFormData] = useState({
+    email: "",
+    password: "",
+  });
+
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  // Handle input change
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+
+    setFormData((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
+
+    // Remove error while typing
+    if (error) {
+      setError("");
+    }
+  };
+
+  // Handle login
+  const handleSubmit = async (e) => {
     e.preventDefault();
 
-    // Firebase login will be added here later
-    console.log("Login submitted");
+    setError("");
+    setLoading(true);
+
+    try {
+      const { email, password } = formData;
+
+      // 1. Firebase login
+      const result = await signInWithEmailAndPassword(
+        auth,
+        email,
+        password
+      );
+
+      const firebaseUser = result.user;
+
+      console.log("Firebase Login Successful:", firebaseUser);
+
+      // 2. Get user profile from MongoDB
+      const response = await fetch(
+        `http://localhost:3000/users/${encodeURIComponent(
+          firebaseUser.email
+        )}`
+      );
+
+      if (!response.ok) {
+        throw new Error("User profile not found in database.");
+      }
+
+      const userData = await response.json();
+
+      console.log("MongoDB User:", userData);
+
+      // 3. Save basic user information locally
+      localStorage.setItem(
+        "khelaro-user",
+        JSON.stringify(userData)
+      );
+
+      // 4. Redirect based on role
+      if (userData.role === "owner") {
+        navigate("/owner-dashboard");
+      } else {
+        navigate("/dashboard");
+      }
+    } catch (error) {
+      console.error("Login error:", error);
+
+      let errorMessage = "Something went wrong. Please try again.";
+
+      switch (error.code) {
+        case "auth/invalid-credential":
+          errorMessage = "Invalid email or password.";
+          break;
+
+        case "auth/user-not-found":
+          errorMessage = "No account found with this email.";
+          break;
+
+        case "auth/wrong-password":
+          errorMessage = "Incorrect password.";
+          break;
+
+        case "auth/invalid-email":
+          errorMessage = "Please enter a valid email address.";
+          break;
+
+        case "auth/too-many-requests":
+          errorMessage =
+            "Too many failed attempts. Please try again later.";
+          break;
+
+        case "auth/network-request-failed":
+          errorMessage =
+            "Network error. Please check your internet connection.";
+          break;
+
+        default:
+          if (error.message === "User profile not found in database.") {
+            errorMessage =
+              "Login successful, but your user profile was not found.";
+          }
+          break;
+      }
+
+      setError(errorMessage);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -44,7 +161,10 @@ const Login = () => {
 
                 <h1 className="text-4xl font-bold leading-tight tracking-tight text-white">
                   Your next game is
-                  <span className="text-green-500"> just a booking away.</span>
+                  <span className="text-green-500">
+                    {" "}
+                    just a booking away.
+                  </span>
                 </h1>
 
                 <p className="mt-5 text-base leading-7 text-gray-400">
@@ -66,14 +186,13 @@ const Login = () => {
               </div>
             </div>
 
-            {/* Decorative elements */}
             <div className="absolute -right-24 -top-24 h-72 w-72 rounded-full bg-green-600/10 blur-3xl" />
             <div className="absolute -bottom-32 -left-20 h-80 w-80 rounded-full bg-green-500/10 blur-3xl" />
           </div>
 
           {/* Right - Login Form */}
           <div className="flex items-center p-6 sm:p-10 lg:p-12">
-            <div className="w-full max-w-md mx-auto">
+            <div className="mx-auto w-full max-w-md">
 
               {/* Mobile Logo */}
               <Link
@@ -89,6 +208,7 @@ const Login = () => {
                 </span>
               </Link>
 
+              {/* Heading */}
               <div>
                 <h2 className="text-3xl font-bold tracking-tight text-gray-900">
                   Welcome back
@@ -99,7 +219,24 @@ const Login = () => {
                 </p>
               </div>
 
-              <form onSubmit={handleSubmit} className="mt-8 space-y-5">
+              {/* Error */}
+              {error && (
+                <div className="mt-6 flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 p-4">
+                  <AlertCircle
+                    size={18}
+                    className="mt-0.5 shrink-0 text-red-500"
+                  />
+
+                  <p className="text-sm leading-5 text-red-600">
+                    {error}
+                  </p>
+                </div>
+              )}
+
+              <form
+                onSubmit={handleSubmit}
+                className="mt-8 space-y-5"
+              >
 
                 {/* Email */}
                 <div>
@@ -122,8 +259,11 @@ const Login = () => {
                       type="email"
                       autoComplete="email"
                       placeholder="you@example.com"
+                      value={formData.email}
+                      onChange={handleChange}
                       required
-                      className="h-12 w-full rounded-xl border border-gray-200 bg-white pl-11 pr-4 text-sm text-gray-900 outline-none transition placeholder:text-gray-400 focus:border-green-500 focus:ring-4 focus:ring-green-500/10"
+                      disabled={loading}
+                      className="h-12 w-full rounded-xl border border-gray-200 bg-white pl-11 pr-4 text-sm text-gray-900 outline-none transition placeholder:text-gray-400 focus:border-green-500 focus:ring-4 focus:ring-green-500/10 disabled:cursor-not-allowed disabled:bg-gray-50"
                     />
                   </div>
                 </div>
@@ -158,14 +298,20 @@ const Login = () => {
                       type={showPassword ? "text" : "password"}
                       autoComplete="current-password"
                       placeholder="Enter your password"
+                      value={formData.password}
+                      onChange={handleChange}
                       required
-                      className="h-12 w-full rounded-xl border border-gray-200 bg-white pl-11 pr-12 text-sm text-gray-900 outline-none transition placeholder:text-gray-400 focus:border-green-500 focus:ring-4 focus:ring-green-500/10"
+                      disabled={loading}
+                      className="h-12 w-full rounded-xl border border-gray-200 bg-white pl-11 pr-12 text-sm text-gray-900 outline-none transition placeholder:text-gray-400 focus:border-green-500 focus:ring-4 focus:ring-green-500/10 disabled:cursor-not-allowed disabled:bg-gray-50"
                     />
 
                     <button
                       type="button"
-                      onClick={() => setShowPassword((prev) => !prev)}
-                      className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 transition hover:text-gray-700"
+                      onClick={() =>
+                        setShowPassword((prev) => !prev)
+                      }
+                      disabled={loading}
+                      className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 transition hover:text-gray-700 disabled:cursor-not-allowed"
                       aria-label={
                         showPassword
                           ? "Hide password"
@@ -186,6 +332,7 @@ const Login = () => {
                   <input
                     id="remember"
                     type="checkbox"
+                    disabled={loading}
                     className="h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500"
                   />
 
@@ -200,14 +347,27 @@ const Login = () => {
                 {/* Submit */}
                 <button
                   type="submit"
-                  className="group flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-green-600 text-sm font-semibold text-white transition hover:bg-green-700 focus:outline-none focus:ring-4 focus:ring-green-500/20"
+                  disabled={loading}
+                  className="group flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-green-600 text-sm font-semibold text-white transition hover:bg-green-700 focus:outline-none focus:ring-4 focus:ring-green-500/20 disabled:cursor-not-allowed disabled:opacity-70"
                 >
-                  Sign in
+                  {loading ? (
+                    <>
+                      <Loader2
+                        size={18}
+                        className="animate-spin"
+                      />
+                      Signing in...
+                    </>
+                  ) : (
+                    <>
+                      Sign in
 
-                  <ArrowRight
-                    size={17}
-                    className="transition-transform group-hover:translate-x-1"
-                  />
+                      <ArrowRight
+                        size={17}
+                        className="transition-transform group-hover:translate-x-1"
+                      />
+                    </>
+                  )}
                 </button>
               </form>
 

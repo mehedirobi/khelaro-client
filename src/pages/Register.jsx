@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import {
   Eye,
   EyeOff,
@@ -11,16 +11,136 @@ import {
   CheckCircle2,
 } from "lucide-react";
 
+import {
+  createUserWithEmailAndPassword,
+  updateProfile,
+} from "firebase/auth";
+
+import { auth } from "../firebase/firebase.config";
+
 const Register = () => {
+  const navigate = useNavigate();
+
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [role, setRole] = useState("customer");
 
-  const handleSubmit = (e) => {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
 
-    // Firebase registration 
-    console.log("Register submitted", { role });
+    setError("");
+    setSuccess("");
+
+    const form = e.target;
+
+    const name = form.name.value.trim();
+    const email = form.email.value.trim();
+    const phone = form.phone.value.trim();
+    const password = form.password.value;
+    const confirmPassword = form.confirmPassword.value;
+
+    // Password match validation
+    if (password !== confirmPassword) {
+      setError("Passwords do not match.");
+      return;
+    }
+
+    // Password length validation
+    if (password.length < 6) {
+      setError("Password must be at least 6 characters.");
+      return;
+    }
+
+    try {
+      setLoading(true);
+
+      // Frontend role -> Backend role
+      const userRole = role === "customer" ? "user" : "owner";
+
+      // 1. Create Firebase account
+      const userCredential = await createUserWithEmailAndPassword(
+        auth,
+        email,
+        password
+      );
+
+      const firebaseUser = userCredential.user;
+
+      // 2. Update Firebase profile
+      await updateProfile(firebaseUser, {
+        displayName: name,
+      });
+
+      // 3. Prepare MongoDB user data
+      const userInfo = {
+        uid: firebaseUser.uid,
+        name,
+        email,
+        phone,
+        role: userRole,
+      };
+
+      // 4. Save user to MongoDB
+      const response = await fetch("http://localhost:3000/users", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(userInfo),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data.message || "Failed to save user information."
+        );
+      }
+
+      // 5. Success
+      setSuccess("Account created successfully!");
+
+      // 6. Redirect
+      setTimeout(() => {
+        navigate("/");
+      }, 1200);
+    } catch (error) {
+      console.error("Registration error:", error);
+
+      let errorMessage = "Registration failed. Please try again.";
+
+      switch (error.code) {
+        case "auth/email-already-in-use":
+          errorMessage = "This email is already registered.";
+          break;
+
+        case "auth/invalid-email":
+          errorMessage = "Please enter a valid email address.";
+          break;
+
+        case "auth/weak-password":
+          errorMessage = "Password must be at least 6 characters.";
+          break;
+
+        case "auth/network-request-failed":
+          errorMessage =
+            "Network error. Please check your internet connection.";
+          break;
+
+        default:
+          if (error.message) {
+            errorMessage = error.message;
+          }
+      }
+
+      setError(errorMessage);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -84,7 +204,7 @@ const Register = () => {
 
           {/* Right - Register Form */}
           <div className="flex items-center p-6 sm:p-10 lg:p-12">
-            <div className="w-full max-w-md mx-auto">
+            <div className="mx-auto w-full max-w-md">
 
               {/* Mobile Logo */}
               <Link
@@ -110,6 +230,20 @@ const Register = () => {
                 </p>
               </div>
 
+              {/* Error Message */}
+              {error && (
+                <div className="mt-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">
+                  {error}
+                </div>
+              )}
+
+              {/* Success Message */}
+              {success && (
+                <div className="mt-5 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-600">
+                  {success}
+                </div>
+              )}
+
               <form onSubmit={handleSubmit} className="mt-7 space-y-4">
 
                 {/* Account Type */}
@@ -121,6 +255,7 @@ const Register = () => {
                   <div className="grid grid-cols-2 gap-3">
                     <button
                       type="button"
+                      disabled={loading}
                       onClick={() => setRole("customer")}
                       className={`rounded-xl border px-4 py-3 text-left transition ${
                         role === "customer"
@@ -139,6 +274,7 @@ const Register = () => {
 
                     <button
                       type="button"
+                      disabled={loading}
                       onClick={() => setRole("owner")}
                       className={`rounded-xl border px-4 py-3 text-left transition ${
                         role === "owner"
@@ -179,7 +315,8 @@ const Register = () => {
                       autoComplete="name"
                       placeholder="Your full name"
                       required
-                      className="h-12 w-full rounded-xl border border-gray-200 pl-11 pr-4 text-sm outline-none transition placeholder:text-gray-400 focus:border-green-500 focus:ring-4 focus:ring-green-500/10"
+                      disabled={loading}
+                      className="h-12 w-full rounded-xl border border-gray-200 pl-11 pr-4 text-sm outline-none transition placeholder:text-gray-400 focus:border-green-500 focus:ring-4 focus:ring-green-500/10 disabled:bg-gray-50"
                     />
                   </div>
                 </div>
@@ -206,7 +343,8 @@ const Register = () => {
                       autoComplete="email"
                       placeholder="you@example.com"
                       required
-                      className="h-12 w-full rounded-xl border border-gray-200 pl-11 pr-4 text-sm outline-none transition placeholder:text-gray-400 focus:border-green-500 focus:ring-4 focus:ring-green-500/10"
+                      disabled={loading}
+                      className="h-12 w-full rounded-xl border border-gray-200 pl-11 pr-4 text-sm outline-none transition placeholder:text-gray-400 focus:border-green-500 focus:ring-4 focus:ring-green-500/10 disabled:bg-gray-50"
                     />
                   </div>
                 </div>
@@ -232,7 +370,8 @@ const Register = () => {
                       type="tel"
                       autoComplete="tel"
                       placeholder="+880 1XXXXXXXXX"
-                      className="h-12 w-full rounded-xl border border-gray-200 pl-11 pr-4 text-sm outline-none transition placeholder:text-gray-400 focus:border-green-500 focus:ring-4 focus:ring-green-500/10"
+                      disabled={loading}
+                      className="h-12 w-full rounded-xl border border-gray-200 pl-11 pr-4 text-sm outline-none transition placeholder:text-gray-400 focus:border-green-500 focus:ring-4 focus:ring-green-500/10 disabled:bg-gray-50"
                     />
                   </div>
                 </div>
@@ -259,12 +398,16 @@ const Register = () => {
                       autoComplete="new-password"
                       placeholder="Create a password"
                       required
-                      className="h-12 w-full rounded-xl border border-gray-200 pl-11 pr-12 text-sm outline-none transition placeholder:text-gray-400 focus:border-green-500 focus:ring-4 focus:ring-green-500/10"
+                      disabled={loading}
+                      className="h-12 w-full rounded-xl border border-gray-200 pl-11 pr-12 text-sm outline-none transition placeholder:text-gray-400 focus:border-green-500 focus:ring-4 focus:ring-green-500/10 disabled:bg-gray-50"
                     />
 
                     <button
                       type="button"
-                      onClick={() => setShowPassword((prev) => !prev)}
+                      disabled={loading}
+                      onClick={() =>
+                        setShowPassword((prev) => !prev)
+                      }
                       className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700"
                       aria-label={
                         showPassword
@@ -307,11 +450,13 @@ const Register = () => {
                       autoComplete="new-password"
                       placeholder="Confirm your password"
                       required
-                      className="h-12 w-full rounded-xl border border-gray-200 pl-11 pr-12 text-sm outline-none transition placeholder:text-gray-400 focus:border-green-500 focus:ring-4 focus:ring-green-500/10"
+                      disabled={loading}
+                      className="h-12 w-full rounded-xl border border-gray-200 pl-11 pr-12 text-sm outline-none transition placeholder:text-gray-400 focus:border-green-500 focus:ring-4 focus:ring-green-500/10 disabled:bg-gray-50"
                     />
 
                     <button
                       type="button"
+                      disabled={loading}
                       onClick={() =>
                         setShowConfirmPassword(
                           (prev) => !prev
@@ -339,6 +484,7 @@ const Register = () => {
                     id="terms"
                     type="checkbox"
                     required
+                    disabled={loading}
                     className="mt-0.5 h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500"
                   />
 
@@ -367,14 +513,24 @@ const Register = () => {
                 {/* Submit */}
                 <button
                   type="submit"
-                  className="group mt-2 flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-green-600 text-sm font-semibold text-white transition hover:bg-green-700 focus:outline-none focus:ring-4 focus:ring-green-500/20"
+                  disabled={loading}
+                  className="group mt-2 flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-green-600 text-sm font-semibold text-white transition hover:bg-green-700 focus:outline-none focus:ring-4 focus:ring-green-500/20 disabled:cursor-not-allowed disabled:opacity-70"
                 >
-                  Create account
+                  {loading ? (
+                    <>
+                      <span className="h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                      Creating account...
+                    </>
+                  ) : (
+                    <>
+                      Create account
 
-                  <ArrowRight
-                    size={17}
-                    className="transition-transform group-hover:translate-x-1"
-                  />
+                      <ArrowRight
+                        size={17}
+                        className="transition-transform group-hover:translate-x-1"
+                      />
+                    </>
+                  )}
                 </button>
               </form>
 

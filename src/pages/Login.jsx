@@ -31,7 +31,7 @@ const Login = () => {
   const isLoading = loading || authLoading;
 
   // -----------------------------
-  // Handle Input Change
+  // Handle Input Change function
   // -----------------------------
   const handleChange = (e) => {
     const { name, value } = e.target;

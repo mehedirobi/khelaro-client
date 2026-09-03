@@ -17,29 +17,36 @@ import BookingConfirmation from "../pages/BookingConfirmation";
 import Payment from "../pages/Payment";
 import BookingSuccess from "../pages/BookingSuccess";
 
+// Customer Dashboard
 import DashboardOverview from "../dashboard/DashboardOverview";
 import MyBookings from "../dashboard/MyBookings";
 import Wishlist from "../dashboard/Wishlist";
 import Profile from "../dashboard/Profile";
 
+// Owner Dashboard
+import OwnerDashboard from "../dashboard/OwnerDashboard";
+
 import NotFound from "../pages/NotFound";
 
 import PrivateRoute from "../routes/PrivateRoute";
-import RoleRoute from "./RoleRoute";
+import RoleRoute from "../routes/RoleRoute";
 
 const router = createBrowserRouter([
-  // =========================
-  // Main Layout
-  // =========================
+  // ========================================
+  // MAIN WEBSITE
+  // ========================================
   {
     path: "/",
     element: <MainLayout />,
+
     children: [
+      // Home
       {
         index: true,
         element: <Home />,
       },
 
+      // Authentication
       {
         path: "login",
         element: <Login />,
@@ -50,6 +57,7 @@ const router = createBrowserRouter([
         element: <Register />,
       },
 
+      // Turfs
       {
         path: "turfs",
         element: <Turf />,
@@ -60,7 +68,10 @@ const router = createBrowserRouter([
         element: <TurfDetails />,
       },
 
-      // Booking requires login
+      // ========================================
+      // BOOKING ROUTES - LOGIN REQUIRED
+      // ========================================
+
       {
         path: "turfs/:id/book",
         element: (
@@ -97,6 +108,7 @@ const router = createBrowserRouter([
         ),
       },
 
+      // Other pages
       {
         path: "about",
         element: <About />,
@@ -109,15 +121,16 @@ const router = createBrowserRouter([
     ],
   },
 
-  // =========================
-  // Dashboard
-  // =========================
+  // ========================================
+  // CUSTOMER DASHBOARD
+  // ========================================
   {
     path: "/dashboard",
+
     element: (
-      <PrivateRoute>
+      <RoleRoute allowedRoles={["user"]}>
         <DashboardLayout />
-      </PrivateRoute>
+      </RoleRoute>
     ),
 
     children: [
@@ -143,9 +156,29 @@ const router = createBrowserRouter([
     ],
   },
 
-  // =========================
+  // ========================================
+  // OWNER DASHBOARD
+  // ========================================
+  {
+    path: "/owner-dashboard",
+
+    element: (
+      <RoleRoute allowedRoles={["owner"]}>
+        <DashboardLayout />
+      </RoleRoute>
+    ),
+
+    children: [
+      {
+        index: true,
+        element: <OwnerDashboard />,
+      },
+    ],
+  },
+
+  // ========================================
   // 404
-  // =========================
+  // ========================================
   {
     path: "*",
     element: <NotFound />,

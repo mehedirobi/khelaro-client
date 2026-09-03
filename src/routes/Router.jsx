@@ -17,7 +17,6 @@ import BookingConfirmation from "../pages/BookingConfirmation";
 import Payment from "../pages/Payment";
 import BookingSuccess from "../pages/BookingSuccess";
 
-// Dashboard Pages
 import DashboardOverview from "../dashboard/DashboardOverview";
 import MyBookings from "../dashboard/MyBookings";
 import Wishlist from "../dashboard/Wishlist";
@@ -25,7 +24,12 @@ import Profile from "../dashboard/Profile";
 
 import NotFound from "../pages/NotFound";
 
+import PrivateRoute from "../routes/PrivateRoute";
+
 const router = createBrowserRouter([
+  // =========================
+  // Main Layout
+  // =========================
   {
     path: "/",
     element: <MainLayout />,
@@ -34,75 +38,116 @@ const router = createBrowserRouter([
         index: true,
         element: <Home />,
       },
+
       {
         path: "login",
         element: <Login />,
       },
+
       {
         path: "register",
         element: <Register />,
       },
+
       {
         path: "turfs",
         element: <Turf />,
       },
+
       {
         path: "turfs/:turfId",
         element: <TurfDetails />,
       },
+
+      // Booking requires login
       {
         path: "turfs/:id/book",
-        element: <BookingSection />,
+        element: (
+          <PrivateRoute>
+            <BookingSection />
+          </PrivateRoute>
+        ),
       },
+
       {
         path: "booking/:id",
-        element: <BookingConfirmation />,
+        element: (
+          <PrivateRoute>
+            <BookingConfirmation />
+          </PrivateRoute>
+        ),
       },
+
       {
         path: "payment/:id",
-        element: <Payment />,
+        element: (
+          <PrivateRoute>
+            <Payment />
+          </PrivateRoute>
+        ),
       },
+
       {
         path: "booking-success/:id",
-        element: <BookingSuccess />,
+        element: (
+          <PrivateRoute>
+            <BookingSuccess />
+          </PrivateRoute>
+        ),
       },
+
       {
         path: "about",
         element: <About />,
       },
+
       {
         path: "contact",
         element: <Contact />,
       },
     ],
   },
-  {
-  path: "*",
-  element: <NotFound />,
-},
 
-  // Dashboard Layout
+  // =========================
+  // Dashboard
+  // =========================
   {
     path: "/dashboard",
-    element: <DashboardLayout />,
+    element: (
+      <PrivateRoute>
+        <DashboardLayout />
+      </PrivateRoute>
+    ),
+
     children: [
       {
         index: true,
         element: <DashboardOverview />,
       },
+
       {
         path: "bookings",
         element: <MyBookings />,
       },
+
       {
         path: "wishlist",
         element: <Wishlist />,
       },
+
       {
         path: "profile",
         element: <Profile />,
       },
     ],
+  },
+
+  // =========================
+  // 404
+  // =========================
+  {
+    path: "*",
+    element: <NotFound />,
   },
 ]);
 

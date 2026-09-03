@@ -25,6 +25,7 @@ import Profile from "../dashboard/Profile";
 import NotFound from "../pages/NotFound";
 
 import PrivateRoute from "../routes/PrivateRoute";
+import RoleRoute from "./RoleRoute";
 
 const router = createBrowserRouter([
   // =========================

@@ -30,6 +30,8 @@ import NotFound from "../pages/NotFound";
 
 import PrivateRoute from "../routes/PrivateRoute";
 import RoleRoute from "../routes/RoleRoute";
+import OwnerDashboardLayout from "../layouts/OwnerDashboardLayout";
+import AddTurf from "../dashboard/AddTurf";
 
 const router = createBrowserRouter([
   // ========================================
@@ -160,22 +162,26 @@ const router = createBrowserRouter([
   // OWNER DASHBOARD
   // ========================================
   {
-    path: "/owner-dashboard",
+  path: "/owner-dashboard",
 
-    element: (
-      <RoleRoute allowedRoles={["owner"]}>
-        <DashboardLayout />
-      </RoleRoute>
-    ),
+  element: (
+    <RoleRoute allowedRoles={["owner"]}>
+      <OwnerDashboardLayout />
+    </RoleRoute>
+  ),
 
-    children: [
-      {
-        index: true,
-        element: <OwnerDashboard />,
-      },
-    ],
-  },
+  children: [
+    {
+      index: true,
+      element: <OwnerDashboard />,
+    },
 
+    {
+      path: "add-turf",
+      element: <AddTurf />,
+    },
+  ],
+},
   // ========================================
   // 404
   // ========================================

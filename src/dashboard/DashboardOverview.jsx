@@ -4,6 +4,7 @@ import {
   Wallet,
   Trophy,
   ArrowRight,
+  ArrowLeft,
   MapPin,
   CheckCircle2,
 } from "lucide-react";
@@ -69,8 +70,13 @@ const DashboardOverview = () => {
 
   return (
     <main>
-      {/* Header */}
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+      {/* =================================================
+          HEADER
+          ================================================= */}
+
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        {/* Heading */}
+
         <div>
           <p className="text-sm font-medium text-green-600">
             Dashboard
@@ -85,16 +91,61 @@ const DashboardOverview = () => {
           </p>
         </div>
 
-        <Link
-          to="/turfs"
-          className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-green-600 px-5 text-sm font-semibold text-white transition hover:bg-green-700"
-        >
-          Find a Turf
-          <ArrowRight size={17} />
-        </Link>
+        {/* =================================================
+            HEADER ACTIONS
+            ================================================= */}
+
+        <div className="flex flex-wrap items-center gap-3">
+          {/* Visit Website */}
+
+          <Link
+            to="/"
+            className="
+              inline-flex h-11 items-center
+              justify-center gap-2 rounded-xl
+              border border-gray-200
+              bg-white px-4
+              text-sm font-semibold text-gray-700
+              transition-all duration-200
+              hover:border-gray-300
+              hover:bg-gray-50
+              hover:text-gray-900
+            "
+          >
+            <ArrowLeft size={17} />
+
+            Visit Website
+          </Link>
+
+          {/* Find Turf */}
+
+          <Link
+            to="/turfs"
+            className="
+              inline-flex h-11 items-center
+              justify-center gap-2 rounded-xl
+              bg-green-600 px-5
+              text-sm font-semibold text-white
+              transition-all duration-200
+              hover:bg-green-700
+              hover:shadow-lg
+              hover:shadow-green-600/20
+            "
+          >
+            Find a Turf
+
+            <ArrowRight
+              size={17}
+              className="transition-transform duration-200"
+            />
+          </Link>
+        </div>
       </div>
 
-      {/* Stats */}
+      {/* =================================================
+          STATS
+          ================================================= */}
+
       <section className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {stats.map((stat) => {
           const Icon = stat.icon;
@@ -102,7 +153,14 @@ const DashboardOverview = () => {
           return (
             <div
               key={stat.title}
-              className="rounded-2xl border border-gray-200 bg-white p-5"
+              className="
+                rounded-2xl
+                border border-gray-200
+                bg-white p-5
+                transition-all duration-200
+                hover:border-gray-300
+                hover:shadow-sm
+              "
             >
               <div className="flex items-start justify-between">
                 <div>
@@ -115,7 +173,14 @@ const DashboardOverview = () => {
                   </h2>
                 </div>
 
-                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-green-50 text-green-600">
+                <div
+                  className="
+                    flex h-11 w-11
+                    items-center justify-center
+                    rounded-xl bg-green-50
+                    text-green-600
+                  "
+                >
                   <Icon size={21} />
                 </div>
               </div>
@@ -128,11 +193,24 @@ const DashboardOverview = () => {
         })}
       </section>
 
-      {/* Main Content */}
+      {/* =================================================
+          MAIN CONTENT
+          ================================================= */}
+
       <section className="mt-8 grid gap-6 xl:grid-cols-[1.5fr_1fr]">
-        {/* Recent Bookings */}
+        {/* =================================================
+            RECENT BOOKINGS
+            ================================================= */}
+
         <div className="rounded-2xl border border-gray-200 bg-white">
-          <div className="flex items-center justify-between border-b border-gray-100 p-5">
+          {/* Section Header */}
+
+          <div
+            className="
+              flex items-center justify-between
+              border-b border-gray-100 p-5
+            "
+          >
             <div>
               <h2 className="font-semibold text-gray-900">
                 Recent Bookings
@@ -145,11 +223,18 @@ const DashboardOverview = () => {
 
             <Link
               to="/dashboard/bookings"
-              className="text-sm font-medium text-green-600 hover:text-green-700"
+              className="
+                text-sm font-medium
+                text-green-600
+                transition-colors
+                hover:text-green-700
+              "
             >
               View all
             </Link>
           </div>
+
+          {/* Bookings */}
 
           <div className="divide-y divide-gray-100">
             {recentBookings.map((booking) => (
@@ -157,43 +242,79 @@ const DashboardOverview = () => {
                 key={booking.id}
                 className="p-5"
               >
-                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <div
+                  className="
+                    flex flex-col gap-4
+                    sm:flex-row sm:items-center
+                    sm:justify-between
+                  "
+                >
+                  {/* Booking Information */}
+
                   <div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
                       <h3 className="font-semibold text-gray-900">
                         {booking.turf}
                       </h3>
 
                       <span
-                        className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${
-                          booking.status === "Upcoming"
-                            ? "bg-blue-50 text-blue-600"
-                            : "bg-green-50 text-green-600"
-                        }`}
+                        className={`
+                          rounded-full
+                          px-2.5 py-1
+                          text-[11px] font-semibold
+                          ${
+                            booking.status === "Upcoming"
+                              ? "bg-blue-50 text-blue-600"
+                              : "bg-green-50 text-green-600"
+                          }
+                        `}
                       >
                         {booking.status}
                       </span>
                     </div>
 
-                    <div className="mt-2 flex flex-wrap gap-x-4 gap-y-2 text-xs text-gray-500">
+                    <div
+                      className="
+                        mt-2 flex flex-wrap
+                        gap-x-4 gap-y-2
+                        text-xs text-gray-500
+                      "
+                    >
+                      {/* Location */}
+
                       <span className="flex items-center gap-1">
                         <MapPin size={14} />
+
                         {booking.location}
                       </span>
 
+                      {/* Date */}
+
                       <span className="flex items-center gap-1">
                         <CalendarDays size={14} />
+
                         {booking.date}
                       </span>
 
+                      {/* Time */}
+
                       <span className="flex items-center gap-1">
                         <Clock3 size={14} />
+
                         {booking.time}
                       </span>
                     </div>
                   </div>
 
-                  <div className="flex items-center justify-between gap-4 sm:block sm:text-right">
+                  {/* Price */}
+
+                  <div
+                    className="
+                      flex items-center
+                      justify-between gap-4
+                      sm:block sm:text-right
+                    "
+                  >
                     <p className="font-bold text-gray-900">
                       ৳{booking.price.toLocaleString()}
                     </p>
@@ -208,10 +329,21 @@ const DashboardOverview = () => {
           </div>
         </div>
 
-        {/* Quick Actions */}
+        {/* =================================================
+            QUICK ACTIONS
+            ================================================= */}
+
         <div className="space-y-6">
+          {/* Find Turf CTA */}
+
           <div className="rounded-2xl bg-gray-900 p-6 text-white">
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-white/10">
+            <div
+              className="
+                flex h-12 w-12
+                items-center justify-center
+                rounded-xl bg-white/10
+              "
+            >
               <CalendarDays size={22} />
             </div>
 
@@ -225,16 +357,40 @@ const DashboardOverview = () => {
 
             <Link
               to="/turfs"
-              className="mt-6 inline-flex items-center gap-2 text-sm font-semibold text-green-400 hover:text-green-300"
+              className="
+                mt-6 inline-flex
+                items-center gap-2
+                text-sm font-semibold
+                text-green-400
+                transition-colors
+                hover:text-green-300
+              "
             >
               Explore Turfs
+
               <ArrowRight size={17} />
             </Link>
           </div>
 
-          <div className="rounded-2xl border border-gray-200 bg-white p-6">
+          {/* Booking Tip */}
+
+          <div
+            className="
+              rounded-2xl
+              border border-gray-200
+              bg-white p-6
+            "
+          >
             <div className="flex items-center gap-3">
-              <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-green-50 text-green-600">
+              <div
+                className="
+                  flex h-11 w-11
+                  items-center justify-center
+                  rounded-xl
+                  bg-green-50
+                  text-green-600
+                "
+              >
                 <CheckCircle2 size={21} />
               </div>
 

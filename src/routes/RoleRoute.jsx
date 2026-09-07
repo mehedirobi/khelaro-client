@@ -6,7 +6,7 @@ const RoleRoute = ({ children, allowedRoles = [] }) => {
   const { currentUser, loading } = useContext(AuthContext);
   const location = useLocation();
 
-  // Firebase auth state check হওয়া পর্যন্ত wait
+  // Firebase auth loading শেষ না হওয়া পর্যন্ত wait
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center">
@@ -42,11 +42,11 @@ const RoleRoute = ({ children, allowedRoles = [] }) => {
 
     localStorage.removeItem("khelaro-user");
 
-    return <Navigate to="/" replace />;
+    return <Navigate to="/login" replace />;
   }
 
-  // User-এর role allowed কিনা
-  if (!allowedRoles.includes(userData.role)) {
+  // Role check
+  if (!userData?.role || !allowedRoles.includes(userData.role)) {
     return <Navigate to="/" replace />;
   }
 

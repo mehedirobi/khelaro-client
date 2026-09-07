@@ -13,10 +13,26 @@ import {
 
 import { AuthContext } from "../contexts/AuthProvider.jsx";
 
+// =====================================================
+// API CONFIG
+// =====================================================
+
+const API_URL =
+  import.meta.env.VITE_API_URL || "http://localhost:3000";
+
+// =====================================================
+// LOGIN COMPONENT
+// =====================================================
+
 const Login = () => {
   const navigate = useNavigate();
 
-  const { login, loading: authLoading } = useContext(AuthContext);
+  const { login, loading: authLoading } =
+    useContext(AuthContext);
+
+  // ===================================================
+  // STATE
+  // ===================================================
 
   const [showPassword, setShowPassword] = useState(false);
 
@@ -30,9 +46,10 @@ const Login = () => {
 
   const isLoading = loading || authLoading;
 
-  // -----------------------------
-  // Handle Input Change function
-  // -----------------------------
+  // ===================================================
+  // HANDLE INPUT CHANGE
+  // ===================================================
+
   const handleChange = (e) => {
     const { name, value } = e.target;
 
@@ -46,108 +63,365 @@ const Login = () => {
     }
   };
 
-  // -----------------------------
-  // Handle Login
-  // -----------------------------
+  // ===================================================
+  // GET USER FROM MONGODB
+  // ===================================================
+
+  const getMongoUser = async (email) => {
+    if (!email) {
+      throw new Error(
+        "Firebase account email was not found."
+      );
+    }
+
+    const normalizedEmail = email
+      .trim()
+      .toLowerCase();
+
+    const url = `${API_URL}/users/${encodeURIComponent(
+      normalizedEmail
+    )}`;
+
+    let response;
+
+    try {
+      response = await fetch(url, {
+        method: "GET",
+        headers: {
+          Accept: "application/json",
+        },
+      });
+    } catch (fetchError) {
+      console.error(
+        "MongoDB user fetch error:",
+        fetchError
+      );
+
+      throw new Error(
+        "BACKEND_CONNECTION_ERROR"
+      );
+    }
+
+    let data = null;
+
+    try {
+      data = await response.json();
+    } catch {
+      data = null;
+    }
+
+    // -----------------------------------------------
+    // USER NOT FOUND
+    // -----------------------------------------------
+
+    if (response.status === 404) {
+      throw new Error(
+        "USER_PROFILE_NOT_FOUND"
+      );
+    }
+
+    // -----------------------------------------------
+    // OTHER BACKEND ERROR
+    // -----------------------------------------------
+
+    if (!response.ok) {
+      throw new Error(
+        data?.message ||
+          "Failed to load user profile."
+      );
+    }
+
+    // -----------------------------------------------
+    // BACKEND RESPONSE
+    //
+    // Your backend returns:
+    //
+    // {
+    //   success: true,
+    //   user: {...}
+    // }
+    // -----------------------------------------------
+
+    const user = data?.user;
+
+    if (!user || !user.email) {
+      throw new Error(
+        "USER_PROFILE_NOT_FOUND"
+      );
+    }
+
+    // -----------------------------------------------
+    // VERIFY EMAIL
+    // -----------------------------------------------
+
+    const databaseEmail = user.email
+      .trim()
+      .toLowerCase();
+
+    if (databaseEmail !== normalizedEmail) {
+      console.error("Email mismatch:", {
+        firebaseEmail: normalizedEmail,
+        databaseEmail,
+      });
+
+      throw new Error(
+        "USER_EMAIL_MISMATCH"
+      );
+    }
+
+    return user;
+  };
+
+  // ===================================================
+  // REDIRECT USER BASED ON ROLE
+  // ===================================================
+
+  const redirectUser = (userData) => {
+    const role = String(
+      userData?.role || "user"
+    )
+      .trim()
+      .toLowerCase();
+
+    switch (role) {
+      case "admin":
+        navigate("/admin-dashboard", {
+          replace: true,
+        });
+        break;
+
+      case "owner":
+        navigate("/owner-dashboard", {
+          replace: true,
+        });
+        break;
+
+      case "user":
+      default:
+        navigate("/dashboard", {
+          replace: true,
+        });
+        break;
+    }
+  };
+
+  // ===================================================
+  // HANDLE LOGIN
+  // ===================================================
+
   const handleSubmit = async (e) => {
     e.preventDefault();
 
     setError("");
 
-    const email = formData.email.trim();
+    const email = formData.email
+      .trim()
+      .toLowerCase();
+
     const password = formData.password;
 
+    // -----------------------------------------------
+    // BASIC VALIDATION
+    // -----------------------------------------------
+
     if (!email || !password) {
-      setError("Please enter your email and password.");
+      setError(
+        "Please enter your email and password."
+      );
       return;
     }
 
     try {
       setLoading(true);
 
-      // 1. Firebase Login
-      const firebaseUser = await login(email, password);
+      // =============================================
+      // 1. FIREBASE LOGIN
+      // =============================================
 
-      console.log("Firebase Login Successful:", firebaseUser);
-
-      // 2. Get MongoDB User
-      const response = await fetch(
-        `http://localhost:3000/users/${encodeURIComponent(
-          firebaseUser.email
-        )}`
+      const firebaseUser = await login(
+        email,
+        password
       );
 
-      if (!response.ok) {
+      if (!firebaseUser) {
         throw new Error(
-          "User profile not found in database."
+          "Firebase login failed. Please try again."
         );
       }
 
-      const userData = await response.json();
+      // =============================================
+      // 2. GET FIREBASE EMAIL
+      // =============================================
 
-      console.log("MongoDB User:", userData);
+      const firebaseEmail =
+        firebaseUser.email
+          ?.trim()
+          .toLowerCase();
 
-      // 3. Save user information locally
+      if (!firebaseEmail) {
+        throw new Error(
+          "Firebase account email was not found."
+        );
+      }
+
+      // =============================================
+      // 3. GET USER FROM MONGODB
+      // =============================================
+
+      const mongoUser =
+        await getMongoUser(firebaseEmail);
+
+      // =============================================
+      // 4. VALIDATE ROLE
+      // =============================================
+
+      const role = String(
+        mongoUser?.role || ""
+      )
+        .trim()
+        .toLowerCase();
+
+      const allowedRoles = [
+        "user",
+        "owner",
+        "admin",
+      ];
+
+      if (!allowedRoles.includes(role)) {
+        throw new Error("INVALID_ROLE");
+      }
+
+      // =============================================
+      // 5. CREATE FINAL USER OBJECT
+      // =============================================
+
+      const finalUserData = {
+        ...mongoUser,
+
+        // Firebase values
+        uid:
+          firebaseUser.uid ||
+          mongoUser.uid ||
+          "",
+
+        email: firebaseEmail,
+
+        // MongoDB role
+        role,
+      };
+
+      // =============================================
+      // 6. SAVE USER LOCALLY
+      // =============================================
+
       localStorage.setItem(
         "khelaro-user",
-        JSON.stringify(userData)
+        JSON.stringify(finalUserData)
       );
 
-      // 4. Redirect based on role
-      if (userData.role === "owner") {
-        navigate("/owner-dashboard");
-      } else {
-        navigate("/dashboard");
-      }
-    } catch (error) {
-      console.error("Login error:", error);
+      localStorage.setItem(
+        "khelaro-uid",
+        firebaseUser.uid
+      );
 
-      // --------------------------------
-      // MongoDB profile error
-      // --------------------------------
+      // =============================================
+      // 7. REDIRECT
+      // =============================================
+
+      redirectUser(finalUserData);
+    } catch (error) {
+      console.error(
+        "Login error:",
+        error
+      );
+
+      // =============================================
+      // MONGODB PROFILE NOT FOUND
+      // =============================================
+
       if (
         error.message ===
-        "User profile not found in database."
+        "USER_PROFILE_NOT_FOUND"
       ) {
         setError(
-          "Login successful, but your user profile was not found in the database."
+          "Login successful, but your Khelaro user profile was not found. Please complete registration first."
         );
 
         return;
       }
 
-      // --------------------------------
-      // Backend connection error
-      // --------------------------------
+      // =============================================
+      // EMAIL MISMATCH
+      // =============================================
+
       if (
-        error.name === "TypeError" &&
-        error.message === "Failed to fetch"
+        error.message ===
+        "USER_EMAIL_MISMATCH"
       ) {
         setError(
-          "Unable to connect to server. Please make sure the backend is running."
+          "Firebase email and Khelaro profile email do not match."
         );
 
         return;
       }
 
-      // --------------------------------
-      // Firebase errors
-      // --------------------------------
+      // =============================================
+      // BACKEND CONNECTION ERROR
+      // =============================================
+
+      if (
+        error.message ===
+        "BACKEND_CONNECTION_ERROR"
+      ) {
+        setError(
+          "Unable to connect to Khelaro server. Please make sure the backend is running on port 3000."
+        );
+
+        return;
+      }
+
+      // =============================================
+      // INVALID ROLE
+      // =============================================
+
+      if (
+        error.message ===
+        "INVALID_ROLE"
+      ) {
+        setError(
+          "Your account has an invalid role. Please contact the administrator."
+        );
+
+        return;
+      }
+
+      // =============================================
+      // FIREBASE AUTH ERRORS
+      // =============================================
+
       switch (error.code) {
         case "auth/invalid-credential":
-          setError("Invalid email or password.");
+          setError(
+            "Invalid email or password."
+          );
           break;
 
         case "auth/user-not-found":
-          setError("No account found with this email.");
+          setError(
+            "No account found with this email."
+          );
           break;
 
         case "auth/wrong-password":
-          setError("Incorrect password.");
+          setError(
+            "Incorrect password."
+          );
           break;
 
         case "auth/invalid-email":
-          setError("Please enter a valid email address.");
+          setError(
+            "Please enter a valid email address."
+          );
           break;
 
         case "auth/too-many-requests":
@@ -162,6 +436,12 @@ const Login = () => {
           );
           break;
 
+        case "auth/user-disabled":
+          setError(
+            "This account has been disabled."
+          );
+          break;
+
         default:
           setError(
             error.message ||
@@ -173,11 +453,14 @@ const Login = () => {
     }
   };
 
+  // ===================================================
+  // UI
+  // ===================================================
+
   return (
     <div className="min-h-[calc(100vh-72px)] overflow-hidden bg-gray-50">
       <div className="mx-auto flex min-h-[calc(100vh-72px)] max-w-7xl items-center justify-center px-4 py-10 sm:px-6 lg:px-8">
 
-        {/* Main Card */}
         <div
           className="
             grid w-full max-w-5xl overflow-hidden rounded-3xl
@@ -187,20 +470,38 @@ const Login = () => {
           "
         >
 
-          {/* ===================================== */}
-          {/* LEFT SIDE */}
-          {/* ===================================== */}
+          {/* =================================================
+              LEFT SIDE
+          ================================================= */}
 
-          <div className="relative hidden overflow-hidden bg-gray-950 p-10 lg:flex lg:flex-col lg:justify-between">
+          <div
+            className="
+              relative hidden overflow-hidden
+              bg-gray-950 p-10
+              lg:flex lg:flex-col lg:justify-between
+            "
+          >
 
             <div className="relative z-10">
 
               {/* Logo */}
+
               <Link
                 to="/"
-                className="inline-flex items-center gap-2 transition-transform duration-200 hover:scale-105"
+                className="
+                  inline-flex items-center gap-2
+                  transition-transform duration-200
+                  hover:scale-105
+                "
               >
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-green-600 text-lg font-bold text-white">
+                <div
+                  className="
+                    flex h-10 w-10
+                    items-center justify-center
+                    rounded-xl bg-green-600
+                    text-lg font-bold text-white
+                  "
+                >
                   K
                 </div>
 
@@ -209,67 +510,122 @@ const Login = () => {
                 </span>
               </Link>
 
-              {/* Content */}
+              {/* Hero Text */}
+
               <div className="mt-24 max-w-md">
 
-                <p className="mb-4 text-sm font-semibold uppercase tracking-wider text-green-400">
+                <p
+                  className="
+                    mb-4 text-sm font-semibold
+                    uppercase tracking-wider
+                    text-green-400
+                  "
+                >
                   Play more. Worry less.
                 </p>
 
-                <h1 className="text-4xl font-bold leading-tight tracking-tight text-white">
+                <h1
+                  className="
+                    text-4xl font-bold
+                    leading-tight tracking-tight
+                    text-white
+                  "
+                >
                   Your next game is
                   <span className="text-green-500">
-                    {" "}
-                    just a booking away.
+                    {" "}just a booking away.
                   </span>
                 </h1>
 
-                <p className="mt-5 text-base leading-7 text-gray-400">
-                  Find the best turfs around Dhaka, check
-                  availability, and book your preferred
-                  playing slot with ease.
+                <p
+                  className="
+                    mt-5 text-base leading-7
+                    text-gray-400
+                  "
+                >
+                  Find the best turfs around Dhaka,
+                  check availability, and book your
+                  preferred playing slot with ease.
                 </p>
 
               </div>
             </div>
 
             {/* Features */}
-            <div className="relative z-10 flex items-center gap-6 border-t border-gray-800 pt-6">
 
-              <div className="flex items-center gap-2 text-sm text-gray-400">
+            <div
+              className="
+                relative z-10 flex items-center
+                gap-6 border-t border-gray-800
+                pt-6
+              "
+            >
+
+              <div
+                className="
+                  flex items-center gap-2
+                  text-sm text-gray-400
+                "
+              >
                 <CheckCircle2
                   size={17}
                   className="text-green-500"
                 />
+
                 Verified turfs
               </div>
 
-              <div className="flex items-center gap-2 text-sm text-gray-400">
+              <div
+                className="
+                  flex items-center gap-2
+                  text-sm text-gray-400
+                "
+              >
                 <CheckCircle2
                   size={17}
                   className="text-green-500"
                 />
+
                 Easy booking
               </div>
 
             </div>
 
-            {/* Decorative Elements */}
-            <div className="absolute -right-24 -top-24 h-72 w-72 rounded-full bg-green-600/10 blur-3xl" />
+            {/* Background Glow */}
 
-            <div className="absolute -bottom-32 -left-20 h-80 w-80 rounded-full bg-green-500/10 blur-3xl" />
+            <div
+              className="
+                absolute -right-24 -top-24
+                h-72 w-72 rounded-full
+                bg-green-600/10 blur-3xl
+              "
+            />
+
+            <div
+              className="
+                absolute -bottom-32 -left-20
+                h-80 w-80 rounded-full
+                bg-green-500/10 blur-3xl
+              "
+            />
 
           </div>
 
-          {/* ===================================== */}
-          {/* RIGHT SIDE */}
-          {/* ===================================== */}
+          {/* =================================================
+              RIGHT SIDE
+          ================================================= */}
 
-          <div className="flex items-center p-6 sm:p-10 lg:p-12">
+          <div
+            className="
+              flex items-center
+              p-6 sm:p-10 lg:p-12
+            "
+          >
 
             <div className="mx-auto w-full max-w-md">
 
               {/* Mobile Logo */}
+
               <Link
                 to="/"
                 className="
@@ -279,57 +635,86 @@ const Login = () => {
                   lg:hidden
                 "
               >
-                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-green-600 text-lg font-bold text-white">
+
+                <div
+                  className="
+                    flex h-9 w-9
+                    items-center justify-center
+                    rounded-xl bg-green-600
+                    text-lg font-bold text-white
+                  "
+                >
                   K
                 </div>
 
                 <span className="text-xl font-bold text-gray-900">
                   Khelaro
                 </span>
+
               </Link>
 
               {/* Heading */}
-              <div className="animate-[slideUp_0.5s_ease-out]">
 
-                <h2 className="text-3xl font-bold tracking-tight text-gray-900">
+              <div
+                className="
+                  animate-[slideUp_0.5s_ease-out]
+                "
+              >
+
+                <h2
+                  className="
+                    text-3xl font-bold
+                    tracking-tight text-gray-900
+                  "
+                >
                   Welcome back
                 </h2>
 
                 <p className="mt-2 text-sm text-gray-500">
-                  Sign in to manage your bookings and find
-                  your next game.
+                  Sign in to manage your bookings
+                  and find your next game.
                 </p>
 
               </div>
 
-              {/* ================================= */}
-              {/* ERROR */}
-              {/* ================================= */}
+              {/* =================================================
+                  ERROR
+              ================================================= */}
 
               {error && (
                 <div
+                  role="alert"
                   className="
-                    mt-6 flex items-start gap-3 rounded-xl
-                    border border-red-200 bg-red-50 p-4
+                    mt-6 flex items-start gap-3
+                    rounded-xl border border-red-200
+                    bg-red-50 p-4
                     animate-[shake_0.3s_ease-in-out]
                   "
                 >
 
                   <AlertCircle
                     size={18}
-                    className="mt-0.5 shrink-0 text-red-500"
+                    className="
+                      mt-0.5 shrink-0
+                      text-red-500
+                    "
                   />
 
-                  <p className="text-sm leading-5 text-red-600">
+                  <p
+                    className="
+                      text-sm leading-5
+                      text-red-600
+                    "
+                  >
                     {error}
                   </p>
 
                 </div>
               )}
 
-              {/* ================================= */}
-              {/* FORM */}
-              {/* ================================= */}
+              {/* =================================================
+                  FORM
+              ================================================= */}
 
               <form
                 onSubmit={handleSubmit}
@@ -340,11 +725,15 @@ const Login = () => {
               >
 
                 {/* Email */}
+
                 <div>
 
                   <label
                     htmlFor="email"
-                    className="mb-2 block text-sm font-medium text-gray-700"
+                    className="
+                      mb-2 block text-sm
+                      font-medium text-gray-700
+                    "
                   >
                     Email address
                   </label>
@@ -390,13 +779,22 @@ const Login = () => {
                 </div>
 
                 {/* Password */}
+
                 <div>
 
-                  <div className="mb-2 flex items-center justify-between">
+                  <div
+                    className="
+                      mb-2 flex items-center
+                      justify-between
+                    "
+                  >
 
                     <label
                       htmlFor="password"
-                      className="block text-sm font-medium text-gray-700"
+                      className="
+                        block text-sm
+                        font-medium text-gray-700
+                      "
                     >
                       Password
                     </label>
@@ -477,18 +875,21 @@ const Login = () => {
                           : "Show password"
                       }
                     >
+
                       {showPassword ? (
                         <EyeOff size={18} />
                       ) : (
                         <Eye size={18} />
                       )}
+
                     </button>
 
                   </div>
 
                 </div>
 
-                {/* Remember */}
+                {/* Remember Me */}
+
                 <div className="flex items-center gap-2">
 
                   <input
@@ -513,6 +914,7 @@ const Login = () => {
                 </div>
 
                 {/* Submit */}
+
                 <button
                   type="submit"
                   disabled={isLoading}
@@ -563,8 +965,13 @@ const Login = () => {
               </form>
 
               {/* Register */}
-              <p className="mt-8 text-center text-sm text-gray-500">
 
+              <p
+                className="
+                  mt-8 text-center
+                  text-sm text-gray-500
+                "
+              >
                 Don't have an account?{" "}
 
                 <Link
@@ -582,6 +989,7 @@ const Login = () => {
               </p>
 
               {/* Owner CTA */}
+
               <div
                 className="
                   mt-8 rounded-2xl
@@ -597,7 +1005,12 @@ const Login = () => {
                   Own a turf?
                 </p>
 
-                <p className="mt-1 text-xs leading-5 text-gray-500">
+                <p
+                  className="
+                    mt-1 text-xs leading-5
+                    text-gray-500
+                  "
+                >
                   List your turf on Khelaro and start
                   managing bookings online.
                 </p>
@@ -605,7 +1018,8 @@ const Login = () => {
                 <Link
                   to="/register?role=owner"
                   className="
-                    mt-3 inline-flex items-center gap-1
+                    mt-3 inline-flex
+                    items-center gap-1
                     text-xs font-semibold
                     text-green-600
                     transition-colors
@@ -624,9 +1038,13 @@ const Login = () => {
           </div>
 
         </div>
+
       </div>
 
-      {/* Custom animations */}
+      {/* =================================================
+          ANIMATIONS
+      ================================================= */}
+
       <style>
         {`
           @keyframes fadeIn {
@@ -634,6 +1052,7 @@ const Login = () => {
               opacity: 0;
               transform: translateY(12px);
             }
+
             to {
               opacity: 1;
               transform: translateY(0);
@@ -645,6 +1064,7 @@ const Login = () => {
               opacity: 0;
               transform: translateY(16px);
             }
+
             to {
               opacity: 1;
               transform: translateY(0);
@@ -655,12 +1075,15 @@ const Login = () => {
             0%, 100% {
               transform: translateX(0);
             }
+
             25% {
               transform: translateX(-4px);
             }
+
             50% {
               transform: translateX(4px);
             }
+
             75% {
               transform: translateX(-2px);
             }

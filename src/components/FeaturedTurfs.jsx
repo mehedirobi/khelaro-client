@@ -68,7 +68,13 @@ const FeaturedTurfs = () => {
           </Link>
         </div>
 
-        
+        {/* Cards */}
+        <div className="mt-10 grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+          {featuredTurfs.map((turf) => (
+            <TurfCard key={turf.id} turf={turf} />
+          ))}
+        </div>
+      </div>
     </section>
   );
 };

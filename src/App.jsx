@@ -7,6 +7,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Home from "./pages/Home";
 import Turfs from "./pages/Turfs";
 import TurfDetails from "./pages/TurfDetails";
+import BookingSection from "./pages/BookingSection";
 
 // =====================================================
 // AUTH PAGES
@@ -64,11 +65,11 @@ function App() {
   return (
     <BrowserRouter>
       <Routes>
-
         {/* =================================================
             PUBLIC WEBSITE
         ================================================= */}
 
+        {/* Home */}
         <Route
           path="/"
           element={
@@ -80,6 +81,7 @@ function App() {
           }
         />
 
+        {/* All Turfs */}
         <Route
           path="/turfs"
           element={
@@ -91,12 +93,25 @@ function App() {
           }
         />
 
+        {/* Turf Details */}
         <Route
           path="/turfs/:id"
           element={
             <>
               <Navbar />
               <TurfDetails />
+              <Footer />
+            </>
+          }
+        />
+
+        {/* Turf Booking / Availability */}
+        <Route
+          path="/turfs/:id/book"
+          element={
+            <>
+              <Navbar />
+              <BookingSection />
               <Footer />
             </>
           }
@@ -148,14 +163,15 @@ function App() {
             </OwnerRoute>
           }
         >
+          {/* Owner Overview */}
           <Route
             index
             element={<OwnerDashboard />}
           />
 
-          {/* Add these when components exist */}
+          {/* Future Owner Routes */}
 
-          {/* 
+          {/*
           <Route
             path="turfs"
             element={<OwnerTurfs />}
@@ -196,43 +212,38 @@ function App() {
           }
         >
           {/* Overview */}
-
           <Route
             index
             element={<AdminDashboard />}
           />
 
           {/* Users */}
-
           <Route
             path="users"
             element={<AdminUsers />}
           />
 
           {/* Turfs */}
-
           <Route
             path="turfs"
             element={<AdminTurfs />}
           />
 
           {/* Bookings */}
-
           <Route
             path="bookings"
             element={<AdminBookings />}
           />
 
           {/* Revenue */}
-
           <Route
             path="revenue"
             element={<AdminRevenue />}
           />
 
-          {/* Owners/Profile components later */}
+          {/* Future Admin Routes */}
 
-          {/* 
+          {/*
           <Route
             path="owners"
             element={<AdminOwners />}
@@ -254,7 +265,6 @@ function App() {
           element={
             <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4">
               <div className="text-center">
-
                 <h1 className="text-6xl font-bold text-gray-900">
                   404
                 </h1>
@@ -266,10 +276,14 @@ function App() {
                 <a
                   href="/"
                   className="
-                    mt-6 inline-flex
-                    rounded-xl bg-green-600
-                    px-5 py-3
-                    text-sm font-semibold
+                    mt-6
+                    inline-flex
+                    rounded-xl
+                    bg-green-600
+                    px-5
+                    py-3
+                    text-sm
+                    font-semibold
                     text-white
                     transition
                     hover:bg-green-700
@@ -277,12 +291,10 @@ function App() {
                 >
                   Back to Website
                 </a>
-
               </div>
             </div>
           }
         />
-
       </Routes>
     </BrowserRouter>
   );

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import {
   CalendarDays,
@@ -9,8 +9,15 @@ import {
   ArrowLeft,
   MapPin,
   Star,
+  Loader2,
 } from "lucide-react";
-import { turfs } from "../data/turfs";
+
+const API_URL = (
+  import.meta.env.VITE_API_URL || "http://localhost:3000"
+).replace(/\/$/, "");
+
+const FALLBACK_IMAGE =
+  "https://placehold.co/1200x800?text=No+Turf+Image";
 
 const timeSlots = [
   "08:00 AM",
@@ -31,16 +38,61 @@ const timeSlots = [
 ];
 
 const BookingSection = () => {
-  const { id } = useParams();
+  const { turfId } = useParams();
+
+  const [turf, setTurf] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
   const [selectedDate, setSelectedDate] = useState("");
   const [selectedSlot, setSelectedSlot] = useState("");
 
-  // Find turf from URL id
-  const turf = turfs.find((item) => item.id === id);
+  useEffect(() => {
+    const fetchTurf = async () => {
+      if (!turfId) {
+        setError("Invalid turf ID.");
+        setLoading(false);
+        return;
+      }
 
-  // If turf doesn't exist
-  if (!turf) {
+      try {
+        setLoading(true);
+        setError("");
+
+        const response = await fetch(
+          `${API_URL}/turfs/${encodeURIComponent(turfId)}`
+        );
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data?.message || "Failed to load turf.");
+        }
+
+        setTurf(data);
+      } catch (error) {
+        console.error("Failed to load turf:", error);
+        setError(error.message || "Failed to load turf.");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchTurf();
+  }, [turfId]);
+
+  if (loading) {
+    return (
+      <main className="flex min-h-[70vh] items-center justify-center bg-gray-50">
+        <div className="flex items-center gap-3 text-sm text-gray-500">
+          <Loader2 size={20} className="animate-spin text-green-600" />
+          Loading turf...
+        </div>
+      </main>
+    );
+  }
+
+  if (error || !turf) {
     return (
       <main className="flex min-h-[70vh] items-center justify-center bg-gray-50 px-4">
         <div className="text-center">
@@ -49,7 +101,7 @@ const BookingSection = () => {
           </h1>
 
           <p className="mt-3 text-sm text-gray-500">
-            The turf you are trying to book does not exist.
+            {error || "The turf you are trying to book does not exist."}
           </p>
 
           <Link
@@ -63,6 +115,23 @@ const BookingSection = () => {
       </main>
     );
   }
+
+  const turfIdValue = String(turf._id);
+  const turfName = turf.name || "Unnamed Turf";
+  const turfImage =
+    turf.image || FALLBACK_IMAGE;
+  const turfLocation =
+    turf.location || "Dhaka, Bangladesh";
+  const turfRating =
+    turf.rating !== undefined &&
+    turf.rating !== null &&
+    turf.rating !== ""
+      ? turf.rating
+      : "New";
+
+  const turfSize = turf.size || "Standard";
+  const turfSurface = turf.surface || "Artificial";
+  const turfPrice = Number(turf.price) || 0;
 
   const getNextTime = (time) => {
     const [timeValue, period] = time.split(" ");
@@ -98,7 +167,9 @@ const BookingSection = () => {
     ? getNextTime(selectedSlot)
     : "";
 
-  const bookingReady = Boolean(selectedDate && selectedSlot);
+  const bookingReady = Boolean(
+    selectedDate && selectedSlot
+  );
 
   return (
     <main className="min-h-screen bg-gray-50">
@@ -106,7 +177,7 @@ const BookingSection = () => {
       <section className="border-b border-gray-200 bg-white">
         <div className="mx-auto max-w-7xl px-4 py-5 sm:px-6 lg:px-8">
           <Link
-            to={`/turfs/${turf.id}`}
+            to={`/turfs/${turfIdValue}`}
             className="inline-flex items-center gap-2 text-sm font-medium text-gray-500 transition hover:text-green-600"
           >
             <ArrowLeft size={16} />
@@ -123,14 +194,18 @@ const BookingSection = () => {
             <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white">
               <div className="relative h-64 sm:h-80">
                 <img
-                  src={turf.image}
-                  alt={turf.name}
+                  src={turfImage}
+                  alt={turfName}
                   className="h-full w-full object-cover"
+                  onError={(event) => {
+                    event.currentTarget.src =
+                      FALLBACK_IMAGE;
+                  }}
                 />
 
                 <div className="absolute left-4 top-4">
                   <span className="rounded-full bg-white/95 px-3 py-1.5 text-xs font-semibold text-gray-800">
-                    {turf.sport}
+                    {turf.sport || "Sports Turf"}
                   </span>
                 </div>
               </div>
@@ -139,7 +214,7 @@ const BookingSection = () => {
                 <div className="flex flex-wrap items-start justify-between gap-4">
                   <div>
                     <h1 className="text-2xl font-bold text-gray-900 sm:text-3xl">
-                      Book {turf.name}
+                      Book {turfName}
                     </h1>
 
                     <div className="mt-3 flex items-center gap-2 text-sm text-gray-500">
@@ -147,7 +222,8 @@ const BookingSection = () => {
                         size={17}
                         className="text-green-600"
                       />
-                      {turf.location}
+
+                      {turfLocation}
                     </div>
                   </div>
 
@@ -158,7 +234,7 @@ const BookingSection = () => {
                     />
 
                     <span className="text-sm font-semibold text-amber-700">
-                      {turf.rating}
+                      {turfRating}
                     </span>
                   </div>
                 </div>
@@ -174,7 +250,6 @@ const BookingSection = () => {
                   reserve this turf.
                 </p>
 
-                {/* Turf Details */}
                 <div className="mt-7 grid gap-4 sm:grid-cols-3">
                   <div className="rounded-xl bg-gray-50 p-4">
                     <p className="text-xs text-gray-400">
@@ -182,7 +257,7 @@ const BookingSection = () => {
                     </p>
 
                     <p className="mt-1 text-sm font-semibold text-gray-900">
-                      {turf.size}
+                      {turfSize}
                     </p>
                   </div>
 
@@ -192,7 +267,7 @@ const BookingSection = () => {
                     </p>
 
                     <p className="mt-1 text-sm font-semibold text-gray-900">
-                      {turf.surface}
+                      {turfSurface}
                     </p>
                   </div>
 
@@ -202,7 +277,7 @@ const BookingSection = () => {
                     </p>
 
                     <p className="mt-1 text-sm font-semibold text-gray-900">
-                      ৳{turf.price.toLocaleString()} / hour
+                      ৳{turfPrice.toLocaleString()} / hour
                     </p>
                   </div>
                 </div>
@@ -247,9 +322,15 @@ const BookingSection = () => {
                   id="booking-date"
                   type="date"
                   value={selectedDate}
-                  min={new Date().toISOString().split("T")[0]}
-                  onChange={(e) => {
-                    setSelectedDate(e.target.value);
+                  min={
+                    new Date()
+                      .toISOString()
+                      .split("T")[0]
+                  }
+                  onChange={(event) => {
+                    setSelectedDate(
+                      event.target.value
+                    );
                     setSelectedSlot("");
                   }}
                   className="h-12 w-full rounded-xl border border-gray-200 bg-white pl-10 pr-4 text-sm text-gray-700 outline-none transition focus:border-green-500 focus:ring-4 focus:ring-green-500/10"
@@ -279,20 +360,26 @@ const BookingSection = () => {
               ) : (
                 <div className="mt-3 grid grid-cols-2 gap-2">
                   {timeSlots.map((slot) => {
-                    const isSelected = selectedSlot === slot;
+                    const isSelected =
+                      selectedSlot === slot;
 
                     return (
                       <button
                         key={slot}
                         type="button"
-                        onClick={() => setSelectedSlot(slot)}
+                        onClick={() =>
+                          setSelectedSlot(slot)
+                        }
                         className={`flex items-center justify-center gap-1.5 rounded-lg border px-3 py-3 text-xs font-medium transition ${
                           isSelected
                             ? "border-green-600 bg-green-600 text-white"
                             : "border-gray-200 bg-white text-gray-600 hover:border-green-400 hover:bg-green-50 hover:text-green-700"
                         }`}
                       >
-                        {isSelected && <Check size={14} />}
+                        {isSelected && (
+                          <Check size={14} />
+                        )}
+
                         {slot}
                       </button>
                     );
@@ -317,11 +404,14 @@ const BookingSection = () => {
                     <span className="font-medium text-gray-900">
                       {new Date(
                         `${selectedDate}T00:00:00`
-                      ).toLocaleDateString("en-BD", {
-                        day: "numeric",
-                        month: "short",
-                        year: "numeric",
-                      })}
+                      ).toLocaleDateString(
+                        "en-BD",
+                        {
+                          day: "numeric",
+                          month: "short",
+                          year: "numeric",
+                        }
+                      )}
                     </span>
                   </div>
 
@@ -332,7 +422,8 @@ const BookingSection = () => {
                     </span>
 
                     <span className="font-medium text-gray-900">
-                      {selectedSlot} - {selectedEndTime}
+                      {selectedSlot} -{" "}
+                      {selectedEndTime}
                     </span>
                   </div>
 
@@ -344,7 +435,7 @@ const BookingSection = () => {
                         </p>
 
                         <p className="mt-1 text-xl font-bold text-gray-900">
-                          ৳{turf.price.toLocaleString()}
+                          ৳{turfPrice.toLocaleString()}
                         </p>
                       </div>
 
@@ -360,7 +451,7 @@ const BookingSection = () => {
             {/* Continue */}
             {bookingReady ? (
               <Link
-                to={`/booking/${turf.id}?date=${selectedDate}&slot=${encodeURIComponent(
+                to={`/booking/${turfIdValue}?date=${selectedDate}&slot=${encodeURIComponent(
                   selectedSlot
                 )}`}
                 className="mt-6 inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-green-600 px-5 text-sm font-semibold text-white transition hover:bg-green-700"

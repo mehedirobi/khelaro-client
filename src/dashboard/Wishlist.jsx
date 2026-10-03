@@ -4,8 +4,8 @@ import {
   MapPin,
   Star,
   ArrowUpRight,
+  ArrowLeft,
   Loader2,
-  X,
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import useAuth from "../hooks/useAuth";
@@ -20,7 +20,9 @@ const Wishlist = () => {
   const [removingId, setRemovingId] = useState(null);
   const [error, setError] = useState("");
 
-  // Fetch wishlist
+  // ==========================================
+  // FETCH WISHLIST
+  // ==========================================
   useEffect(() => {
     const fetchWishlist = async () => {
       if (!currentUser?.email) {
@@ -48,6 +50,7 @@ const Wishlist = () => {
         setWishlistTurfs(Array.isArray(data) ? data : []);
       } catch (error) {
         console.error("Wishlist fetch error:", error);
+
         setError("Failed to load your wishlist.");
         setWishlistTurfs([]);
       } finally {
@@ -58,7 +61,9 @@ const Wishlist = () => {
     fetchWishlist();
   }, [currentUser?.email]);
 
-  // Remove from wishlist
+  // ==========================================
+  // REMOVE FROM WISHLIST
+  // ==========================================
   const handleRemove = async (turfId) => {
     if (!currentUser?.email || !turfId) return;
 
@@ -79,10 +84,11 @@ const Wishlist = () => {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.message || "Failed to remove wishlist");
+        throw new Error(
+          data.message || "Failed to remove wishlist"
+        );
       }
 
-      // Remove from UI immediately
       setWishlistTurfs((prev) =>
         prev.filter(
           (turf) => String(turf.turfId) !== String(turfId)
@@ -90,6 +96,7 @@ const Wishlist = () => {
       );
     } catch (error) {
       console.error("Remove wishlist error:", error);
+
       alert(error.message || "Failed to remove turf");
     } finally {
       setRemovingId(null);
@@ -98,22 +105,51 @@ const Wishlist = () => {
 
   return (
     <main>
-      {/* Header */}
+      {/* ================= HEADER ================= */}
       <div>
-        <p className="text-sm font-medium text-green-600">
-          Dashboard
-        </p>
+        {/* Back to Home */}
+        <Link
+          to="/"
+          className="
+            inline-flex
+            h-11
+            items-center
+            justify-center
+            gap-2
+            rounded-xl
+            bg-green-600
+            px-5
+            text-sm
+            font-semibold
+            text-white
+            transition-all
+            duration-200
+            hover:bg-green-700
+            hover:shadow-md
+            hover:shadow-green-600/20
+          "
+        >
+          <ArrowLeft size={16} />
+          Back to Home
+        </Link>
 
-        <h1 className="mt-1 text-2xl font-bold text-gray-900 sm:text-3xl">
-          Wishlist
-        </h1>
+        {/* Header Content */}
+        <div className="mt-5">
+          <p className="text-sm font-medium text-green-600">
+            Dashboard
+          </p>
 
-        <p className="mt-2 text-sm text-gray-500">
-          Your saved turfs for future games.
-        </p>
+          <h1 className="mt-1 text-2xl font-bold text-gray-900 sm:text-3xl">
+            Wishlist
+          </h1>
+
+          <p className="mt-2 text-sm text-gray-500">
+            Your saved turfs for future games.
+          </p>
+        </div>
       </div>
 
-      {/* Loading */}
+      {/* ================= LOADING ================= */}
       {loading && (
         <div className="mt-10 flex flex-col items-center justify-center py-16">
           <Loader2
@@ -127,7 +163,7 @@ const Wishlist = () => {
         </div>
       )}
 
-      {/* Error */}
+      {/* ================= ERROR ================= */}
       {!loading && error && (
         <div className="mt-8 rounded-2xl border border-red-100 bg-red-50 p-6 text-center">
           <p className="text-sm font-medium text-red-600">
@@ -136,7 +172,7 @@ const Wishlist = () => {
         </div>
       )}
 
-      {/* Wishlist */}
+      {/* ================= WISHLIST ================= */}
       {!loading && !error && (
         <>
           {wishlistTurfs.length > 0 ? (
@@ -144,7 +180,16 @@ const Wishlist = () => {
               {wishlistTurfs.map((turf) => (
                 <article
                   key={turf.wishlistId || turf.turfId}
-                  className="group overflow-hidden rounded-2xl border border-gray-200 bg-white transition hover:-translate-y-1 hover:shadow-lg"
+                  className="
+                    group overflow-hidden
+                    rounded-2xl
+                    border border-gray-200
+                    bg-white
+                    transition
+                    hover:-translate-y-1
+                    hover:border-gray-300
+                    hover:shadow-lg
+                  "
                 >
                   {/* Image */}
                   <div className="relative aspect-[16/10] overflow-hidden bg-gray-100">
@@ -152,7 +197,11 @@ const Wishlist = () => {
                       <img
                         src={turf.image}
                         alt={turf.name}
-                        className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
+                        className="
+                          h-full w-full object-cover
+                          transition duration-500
+                          group-hover:scale-105
+                        "
                       />
                     ) : (
                       <div className="flex h-full items-center justify-center text-sm text-gray-400">
@@ -166,7 +215,19 @@ const Wishlist = () => {
                       onClick={() => handleRemove(turf.turfId)}
                       disabled={removingId === turf.turfId}
                       aria-label={`Remove ${turf.name} from wishlist`}
-                      className="absolute right-4 top-4 flex h-10 w-10 items-center justify-center rounded-full bg-white text-red-500 shadow-sm transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
+                      className="
+                        absolute right-4 top-4
+                        flex h-10 w-10
+                        items-center justify-center
+                        rounded-full
+                        bg-white
+                        text-red-500
+                        shadow-sm
+                        transition
+                        hover:bg-red-50
+                        disabled:cursor-not-allowed
+                        disabled:opacity-60
+                      "
                     >
                       {removingId === turf.turfId ? (
                         <Loader2
@@ -212,7 +273,9 @@ const Wishlist = () => {
                         className="mt-0.5 shrink-0"
                       />
 
-                      <span>{turf.location || "Dhaka, Bangladesh"}</span>
+                      <span>
+                        {turf.location || "Dhaka, Bangladesh"}
+                      </span>
                     </div>
 
                     {/* Turf Info */}
@@ -224,14 +287,16 @@ const Wishlist = () => {
                           </span>
                         )}
 
-                        {turf.facilities?.slice(0, 2).map((facility) => (
-                          <span
-                            key={facility}
-                            className="rounded-full bg-gray-50 px-2.5 py-1 text-xs text-gray-500"
-                          >
-                            {facility}
-                          </span>
-                        ))}
+                        {turf.facilities
+                          ?.slice(0, 2)
+                          .map((facility) => (
+                            <span
+                              key={facility}
+                              className="rounded-full bg-gray-50 px-2.5 py-1 text-xs text-gray-500"
+                            >
+                              {facility}
+                            </span>
+                          ))}
                       </div>
                     )}
 
@@ -245,7 +310,11 @@ const Wishlist = () => {
                         </p>
 
                         <p className="mt-1 text-lg font-bold text-gray-900">
-                          ৳{Number(turf.price || 0).toLocaleString()}
+                          ৳
+                          {Number(
+                            turf.price || 0
+                          ).toLocaleString()}
+
                           <span className="ml-1 text-xs font-normal text-gray-400">
                             / hour
                           </span>
@@ -255,7 +324,15 @@ const Wishlist = () => {
                       <Link
                         to={`/turfs/${turf.turfId}`}
                         aria-label={`View ${turf.name}`}
-                        className="flex h-10 w-10 items-center justify-center rounded-xl bg-gray-900 text-white transition hover:bg-green-600"
+                        className="
+                          flex h-10 w-10
+                          items-center justify-center
+                          rounded-xl
+                          bg-gray-900
+                          text-white
+                          transition
+                          hover:bg-green-600
+                        "
                       >
                         <ArrowUpRight size={17} />
                       </Link>
@@ -265,7 +342,7 @@ const Wishlist = () => {
               ))}
             </div>
           ) : (
-            /* Empty */
+            /* ================= EMPTY ================= */
             <div className="mt-8 rounded-2xl border border-gray-200 bg-white py-20 text-center">
               <Heart
                 size={38}
@@ -282,7 +359,16 @@ const Wishlist = () => {
 
               <Link
                 to="/turfs"
-                className="mt-6 inline-flex rounded-xl bg-green-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-green-700"
+                className="
+                  mt-6 inline-flex
+                  rounded-xl
+                  bg-green-600
+                  px-5 py-3
+                  text-sm font-semibold
+                  text-white
+                  transition
+                  hover:bg-green-700
+                "
               >
                 Explore Turfs
               </Link>

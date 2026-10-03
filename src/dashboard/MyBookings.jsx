@@ -9,6 +9,7 @@ import {
   Loader2,
 } from "lucide-react";
 import useAuth from "../hooks/useAuth";
+
 const API_URL = import.meta.env.VITE_API_URL;
 
 const MyBookings = () => {
@@ -20,7 +21,9 @@ const MyBookings = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  // Fetch logged-in user's bookings
+  // ==========================================
+  // FETCH CURRENT USER'S BOOKINGS
+  // ==========================================
   useEffect(() => {
     const fetchMyBookings = async () => {
       if (!currentUser?.email) {
@@ -34,23 +37,29 @@ const MyBookings = () => {
         setError("");
 
         const email = encodeURIComponent(
-          currentUser.email.toLowerCase()
+          currentUser.email.trim().toLowerCase()
         );
 
         const response = await fetch(
           `${API_URL}/bookings/user/${email}`
         );
 
-        if (!response.ok) {
-          throw new Error("Failed to fetch bookings");
-        }
-
         const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(
+            data?.message || "Failed to fetch bookings"
+          );
+        }
 
         setBookings(Array.isArray(data) ? data : []);
       } catch (error) {
         console.error("My bookings error:", error);
-        setError("Failed to load your bookings.");
+
+        setError(
+          error.message || "Failed to load your bookings."
+        );
+
         setBookings([]);
       } finally {
         setLoading(false);
@@ -60,7 +69,9 @@ const MyBookings = () => {
     fetchMyBookings();
   }, [currentUser?.email]);
 
-  // Format date
+  // ==========================================
+  // FORMAT DATE
+  // ==========================================
   const formatDate = (date) => {
     if (!date) return "N/A";
 
@@ -77,19 +88,26 @@ const MyBookings = () => {
     });
   };
 
-  // Format time
+  // ==========================================
+  // FORMAT TIME
+  // ==========================================
   const formatTime = (time) => {
     if (!time) return "N/A";
 
-    // If backend already sends something like "18:00"
-    const [hours, minutes] = time.split(":");
+    const [hours, minutes] = String(time).split(":");
 
     if (hours === undefined || minutes === undefined) {
       return time;
     }
 
     const date = new Date();
-    date.setHours(Number(hours), Number(minutes), 0, 0);
+
+    date.setHours(
+      Number(hours),
+      Number(minutes),
+      0,
+      0
+    );
 
     return date.toLocaleTimeString("en-US", {
       hour: "2-digit",
@@ -97,56 +115,86 @@ const MyBookings = () => {
     });
   };
 
-  // Convert backend status to UI status
+  // ==========================================
+  // GET DISPLAY STATUS
+  // ==========================================
   const getDisplayStatus = (booking) => {
     const status = booking.status?.toLowerCase();
 
-    if (status === "cancelled" || status === "canceled") {
+    // Explicit cancelled status
+    if (
+      status === "cancelled" ||
+      status === "canceled"
+    ) {
       return "Cancelled";
     }
 
+    // Explicit completed status
     if (status === "completed") {
       return "Completed";
     }
 
-    // Pending / confirmed bookings
-    const bookingDate = new Date(booking.date);
-    const today = new Date();
+    // Check booking date
+    if (booking.date) {
+      const bookingDate = new Date(booking.date);
+      const today = new Date();
 
-    bookingDate.setHours(0, 0, 0, 0);
-    today.setHours(0, 0, 0, 0);
+      if (
+        !Number.isNaN(bookingDate.getTime())
+      ) {
+        bookingDate.setHours(0, 0, 0, 0);
+        today.setHours(0, 0, 0, 0);
 
-    if (bookingDate < today) {
-      return "Completed";
+        if (bookingDate < today) {
+          return "Completed";
+        }
+      }
     }
 
+    // pending / confirmed
     return "Upcoming";
   };
 
-  // Filter bookings
-  const filteredBookings = bookings.filter((booking) => {
-    const displayStatus = getDisplayStatus(booking);
+  // ==========================================
+  // FILTER BOOKINGS
+  // ==========================================
+  const filteredBookings = bookings.filter(
+    (booking) => {
+      const displayStatus =
+        getDisplayStatus(booking);
 
-    const matchesTab =
-      activeTab === "All" ||
-      displayStatus === activeTab;
+      const matchesTab =
+        activeTab === "All" ||
+        displayStatus === activeTab;
 
-    const searchText = search.toLowerCase();
+      const searchText =
+        search.trim().toLowerCase();
 
-    const matchesSearch =
-      booking.turfName
-        ?.toLowerCase()
-        .includes(searchText) ||
-      booking.ownerEmail
-        ?.toLowerCase()
-        .includes(searchText) ||
-      booking.status
-        ?.toLowerCase()
-        .includes(searchText);
+      if (!searchText) {
+        return matchesTab;
+      }
 
-    return matchesTab && matchesSearch;
-  });
+      const searchableText = [
+        booking.turfName,
+        booking.location,
+        booking.ownerEmail,
+        booking.status,
+        booking.paymentStatus,
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
 
+      const matchesSearch =
+        searchableText.includes(searchText);
+
+      return matchesTab && matchesSearch;
+    }
+  );
+
+  // ==========================================
+  // STATUS STYLE
+  // ==========================================
   const getStatusStyle = (status) => {
     if (status === "Upcoming") {
       return "bg-blue-50 text-blue-600";
@@ -161,7 +209,7 @@ const MyBookings = () => {
 
   return (
     <main>
-      {/* Header */}
+      {/* ================= HEADER ================= */}
       <div>
         <p className="text-sm font-medium text-green-600">
           Dashboard
@@ -176,25 +224,29 @@ const MyBookings = () => {
         </p>
       </div>
 
-      {/* Filters */}
+      {/* ================= FILTERS ================= */}
       <div className="mt-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        {/* Tabs */}
         <div className="flex flex-wrap gap-2">
-          {["All", "Upcoming", "Completed", "Cancelled"].map(
-            (tab) => (
-              <button
-                key={tab}
-                type="button"
-                onClick={() => setActiveTab(tab)}
-                className={`rounded-lg px-4 py-2 text-sm font-medium transition ${
-                  activeTab === tab
-                    ? "bg-green-600 text-white"
-                    : "bg-white text-gray-500 hover:bg-gray-100"
-                }`}
-              >
-                {tab}
-              </button>
-            )
-          )}
+          {[
+            "All",
+            "Upcoming",
+            "Completed",
+            "Cancelled",
+          ].map((tab) => (
+            <button
+              key={tab}
+              type="button"
+              onClick={() => setActiveTab(tab)}
+              className={`rounded-lg px-4 py-2 text-sm font-medium transition ${
+                activeTab === tab
+                  ? "bg-green-600 text-white"
+                  : "bg-white text-gray-500 hover:bg-gray-100"
+              }`}
+            >
+              {tab}
+            </button>
+          ))}
         </div>
 
         {/* Search */}
@@ -207,7 +259,9 @@ const MyBookings = () => {
           <input
             type="text"
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) =>
+              setSearch(e.target.value)
+            }
             placeholder="Search bookings..."
             className="h-11 w-full rounded-xl border border-gray-200 bg-white pl-10 pr-10 text-sm outline-none focus:border-green-500"
           />
@@ -216,7 +270,7 @@ const MyBookings = () => {
             <button
               type="button"
               onClick={() => setSearch("")}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400"
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
             >
               <X size={16} />
             </button>
@@ -224,7 +278,7 @@ const MyBookings = () => {
         </div>
       </div>
 
-      {/* Loading */}
+      {/* ================= LOADING ================= */}
       {loading && (
         <div className="mt-10 flex flex-col items-center justify-center py-16">
           <Loader2
@@ -238,7 +292,7 @@ const MyBookings = () => {
         </div>
       )}
 
-      {/* Error */}
+      {/* ================= ERROR ================= */}
       {!loading && error && (
         <div className="mt-6 rounded-2xl border border-red-100 bg-red-50 p-6 text-center">
           <p className="text-sm font-medium text-red-600">
@@ -247,12 +301,13 @@ const MyBookings = () => {
         </div>
       )}
 
-      {/* Bookings */}
+      {/* ================= BOOKINGS ================= */}
       {!loading && !error && (
         <div className="mt-6 space-y-4">
           {filteredBookings.length > 0 ? (
             filteredBookings.map((booking) => {
-              const displayStatus = getDisplayStatus(booking);
+              const displayStatus =
+                getDisplayStatus(booking);
 
               return (
                 <article
@@ -260,8 +315,9 @@ const MyBookings = () => {
                   className="rounded-2xl border border-gray-200 bg-white p-5 sm:p-6"
                 >
                   <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
-                    {/* Booking Info */}
+                    {/* BOOKING INFORMATION */}
                     <div>
+                      {/* Status + Booking ID */}
                       <div className="flex flex-wrap items-center gap-3">
                         <span
                           className={`rounded-full px-3 py-1 text-xs font-semibold ${getStatusStyle(
@@ -273,41 +329,54 @@ const MyBookings = () => {
 
                         <span className="text-xs text-gray-400">
                           {booking._id
-                            ? `KHL-${booking._id.slice(-6).toUpperCase()}`
+                            ? `KHL-${booking._id
+                                .slice(-6)
+                                .toUpperCase()}`
                             : "Booking"}
                         </span>
                       </div>
 
+                      {/* Turf Name */}
                       <h2 className="mt-3 text-lg font-bold text-gray-900">
-                        {booking.turfName || "Turf"}
+                        {booking.turfName ||
+                          "Turf"}
                       </h2>
 
+                      {/* Date / Time / Location */}
                       <div className="mt-3 flex flex-wrap gap-x-5 gap-y-3 text-sm text-gray-500">
                         {/* Location */}
-                        <span className="flex items-center gap-1.5">
-                          <MapPin size={16} />
-
-                          {booking.location ||
-                            "Dhaka, Bangladesh"}
-                        </span>
+                        {booking.location && (
+                          <span className="flex items-center gap-1.5">
+                            <MapPin size={16} />
+                            {booking.location}
+                          </span>
+                        )}
 
                         {/* Date */}
                         <span className="flex items-center gap-1.5">
                           <CalendarDays size={16} />
-
-                          {formatDate(booking.date)}
+                          {formatDate(
+                            booking.date
+                          )}
                         </span>
 
                         {/* Time */}
                         <span className="flex items-center gap-1.5">
                           <Clock3 size={16} />
 
-                          {formatTime(booking.startTime)} -{" "}
-                          {formatTime(booking.endTime)}
+                          {formatTime(
+                            booking.startTime
+                          )}
+
+                          {" - "}
+
+                          {formatTime(
+                            booking.endTime
+                          )}
                         </span>
                       </div>
 
-                      {/* Payment Status */}
+                      {/* Payment */}
                       <div className="mt-4">
                         <span
                           className={`text-xs font-medium ${
@@ -318,12 +387,13 @@ const MyBookings = () => {
                           }`}
                         >
                           Payment:{" "}
-                          {booking.paymentStatus || "Unpaid"}
+                          {booking.paymentStatus ||
+                            "Unpaid"}
                         </span>
                       </div>
                     </div>
 
-                    {/* Price + Details */}
+                    {/* PRICE + DETAILS */}
                     <div className="flex items-center justify-between gap-5 lg:block lg:text-right">
                       <div>
                         <p className="text-xs text-gray-400">

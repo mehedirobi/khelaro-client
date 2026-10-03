@@ -216,7 +216,7 @@ const DashboardOverview = () => {
         {/* Back to Home */}
 
         <Link
-          to="/"
+          to="/turfs"
           className="
             inline-flex
             h-11

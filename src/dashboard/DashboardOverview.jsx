@@ -213,7 +213,7 @@ const MyBookings = () => {
       <div>
         {/* Back to Home */}
         <Link
-          to="/"
+          to="/turfs"
           className="
             inline-flex h-11 items-center
             justify-center gap-2 rounded-xl

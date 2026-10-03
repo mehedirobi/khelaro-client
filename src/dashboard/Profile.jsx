@@ -6,8 +6,10 @@ import {
   Camera,
   Save,
   X,
+  ArrowLeft,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { Link } from "react-router-dom";
 import Swal from "sweetalert2";
 import useAuth from "../hooks/useAuth";
 
@@ -134,7 +136,6 @@ const Profile = () => {
 
     if (!file) return;
 
-    // Check Cloudinary configuration
     if (!CLOUDINARY_CLOUD_NAME || !UPLOAD_PRESET) {
       Swal.fire({
         icon: "error",
@@ -148,7 +149,6 @@ const Profile = () => {
       return;
     }
 
-    // Check file type
     if (!file.type.startsWith("image/")) {
       Swal.fire({
         icon: "warning",
@@ -161,7 +161,6 @@ const Profile = () => {
       return;
     }
 
-    // Check file size
     if (file.size > 5 * 1024 * 1024) {
       Swal.fire({
         icon: "warning",
@@ -202,7 +201,6 @@ const Profile = () => {
         );
       }
 
-      // Save Cloudinary URL in React state
       setFormData((previous) => ({
         ...previous,
         photoURL: data.secure_url,
@@ -233,7 +231,6 @@ const Profile = () => {
     } finally {
       setUploading(false);
 
-      // Allow selecting same file again
       e.target.value = "";
     }
   };
@@ -312,7 +309,6 @@ const Profile = () => {
 
       const updatedUser = data.user;
 
-      // Update UI with latest data
       setFormData({
         name: updatedUser.name || "",
 
@@ -330,7 +326,6 @@ const Profile = () => {
           updatedUser.photoURL || "",
       });
 
-      // Keep local user data updated
       localStorage.setItem(
         "khelaro-user",
         JSON.stringify(updatedUser)
@@ -433,27 +428,53 @@ const Profile = () => {
 
   return (
     <main>
-      {/* Header */}
+      {/* ================= HEADER ================= */}
 
       <div>
-        <p className="text-sm font-medium text-green-600">
-          Dashboard
-        </p>
+        {/* Back to Home */}
 
-        <h1 className="mt-1 text-2xl font-bold text-gray-900 sm:text-3xl">
-          Profile Settings
-        </h1>
+        <Link
+          to="/turfs"
+          className="
+            inline-flex h-10
+            items-center justify-center
+            gap-2 rounded-xl
+            bg-green-600
+            px-4
+            text-sm font-semibold
+            text-white
+            transition-all duration-200
+            hover:bg-green-700
+            hover:shadow-lg
+            hover:shadow-green-600/20
+          "
+        >
+          <ArrowLeft size={17} />
+          Back to Home
+        </Link>
 
-        <p className="mt-2 text-sm text-gray-500">
-          Manage your personal information and
-          account details.
-        </p>
+        {/* Header Content */}
+
+        <div className="mt-5">
+          <p className="text-sm font-medium text-green-600">
+            Dashboard
+          </p>
+
+          <h1 className="mt-1 text-2xl font-bold text-gray-900 sm:text-3xl">
+            Profile Settings
+          </h1>
+
+          <p className="mt-2 text-sm text-gray-500">
+            Manage your personal information and
+            account details.
+          </p>
+        </div>
       </div>
 
-      {/* Content */}
+      {/* ================= CONTENT ================= */}
 
       <div className="mt-8 grid gap-6 xl:grid-cols-[280px_1fr]">
-        {/* Profile Card */}
+        {/* ================= PROFILE CARD ================= */}
 
         <aside className="h-fit rounded-2xl border border-gray-200 bg-white p-6">
           <div className="flex flex-col items-center text-center">
@@ -483,7 +504,20 @@ const Profile = () => {
                   fileInputRef.current?.click()
                 }
                 disabled={uploading}
-                className="absolute bottom-0 right-0 flex h-9 w-9 items-center justify-center rounded-full border-2 border-white bg-green-600 text-white shadow-sm transition hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-60"
+                className="
+                  absolute bottom-0 right-0
+                  flex h-9 w-9
+                  items-center justify-center
+                  rounded-full
+                  border-2 border-white
+                  bg-green-600
+                  text-white
+                  shadow-sm
+                  transition
+                  hover:bg-green-700
+                  disabled:cursor-not-allowed
+                  disabled:opacity-60
+                "
                 aria-label="Upload profile photo"
               >
                 {uploading ? (
@@ -510,10 +544,19 @@ const Profile = () => {
               <button
                 type="button"
                 onClick={handleRemovePhoto}
-                className="mt-3 inline-flex items-center gap-1.5 text-xs font-medium text-red-500 transition hover:text-red-600"
+                className="
+                  mt-3
+                  inline-flex
+                  items-center
+                  gap-1.5
+                  text-xs
+                  font-medium
+                  text-red-500
+                  transition
+                  hover:text-red-600
+                "
               >
                 <X size={14} />
-
                 Remove photo
               </button>
             )}
@@ -581,7 +624,7 @@ const Profile = () => {
           </div>
         </aside>
 
-        {/* Personal Information */}
+        {/* ================= PERSONAL INFORMATION ================= */}
 
         <section className="rounded-2xl border border-gray-200 bg-white p-6 sm:p-8">
           <div>
@@ -612,7 +655,11 @@ const Profile = () => {
                 <div className="relative">
                   <User
                     size={18}
-                    className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+                    className="
+                      absolute left-3 top-1/2
+                      -translate-y-1/2
+                      text-gray-400
+                    "
                   />
 
                   <input
@@ -622,7 +669,18 @@ const Profile = () => {
                     value={formData.name}
                     onChange={handleChange}
                     placeholder="Enter your full name"
-                    className="h-12 w-full rounded-xl border border-gray-200 pl-10 pr-4 text-sm outline-none transition focus:border-green-500 focus:ring-4 focus:ring-green-500/10"
+                    className="
+                      h-12 w-full
+                      rounded-xl
+                      border border-gray-200
+                      pl-10 pr-4
+                      text-sm
+                      outline-none
+                      transition
+                      focus:border-green-500
+                      focus:ring-4
+                      focus:ring-green-500/10
+                    "
                   />
                 </div>
               </div>
@@ -640,7 +698,11 @@ const Profile = () => {
                 <div className="relative">
                   <Mail
                     size={18}
-                    className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+                    className="
+                      absolute left-3 top-1/2
+                      -translate-y-1/2
+                      text-gray-400
+                    "
                   />
 
                   <input
@@ -648,7 +710,17 @@ const Profile = () => {
                     type="email"
                     value={formData.email}
                     disabled
-                    className="h-12 w-full cursor-not-allowed rounded-xl border border-gray-200 bg-gray-50 pl-10 pr-4 text-sm text-gray-500 outline-none"
+                    className="
+                      h-12 w-full
+                      cursor-not-allowed
+                      rounded-xl
+                      border border-gray-200
+                      bg-gray-50
+                      pl-10 pr-4
+                      text-sm
+                      text-gray-500
+                      outline-none
+                    "
                   />
                 </div>
 
@@ -670,7 +742,11 @@ const Profile = () => {
                 <div className="relative">
                   <Phone
                     size={18}
-                    className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+                    className="
+                      absolute left-3 top-1/2
+                      -translate-y-1/2
+                      text-gray-400
+                    "
                   />
 
                   <input
@@ -680,7 +756,18 @@ const Profile = () => {
                     value={formData.phone}
                     onChange={handleChange}
                     placeholder="+880 1XXXXXXXXX"
-                    className="h-12 w-full rounded-xl border border-gray-200 pl-10 pr-4 text-sm outline-none transition focus:border-green-500 focus:ring-4 focus:ring-green-500/10"
+                    className="
+                      h-12 w-full
+                      rounded-xl
+                      border border-gray-200
+                      pl-10 pr-4
+                      text-sm
+                      outline-none
+                      transition
+                      focus:border-green-500
+                      focus:ring-4
+                      focus:ring-green-500/10
+                    "
                   />
                 </div>
               </div>
@@ -698,7 +785,11 @@ const Profile = () => {
                 <div className="relative">
                   <MapPin
                     size={18}
-                    className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+                    className="
+                      absolute left-3 top-1/2
+                      -translate-y-1/2
+                      text-gray-400
+                    "
                   />
 
                   <input
@@ -708,7 +799,18 @@ const Profile = () => {
                     value={formData.location}
                     onChange={handleChange}
                     placeholder="Dhaka, Bangladesh"
-                    className="h-12 w-full rounded-xl border border-gray-200 pl-10 pr-4 text-sm outline-none transition focus:border-green-500 focus:ring-4 focus:ring-green-500/10"
+                    className="
+                      h-12 w-full
+                      rounded-xl
+                      border border-gray-200
+                      pl-10 pr-4
+                      text-sm
+                      outline-none
+                      transition
+                      focus:border-green-500
+                      focus:ring-4
+                      focus:ring-green-500/10
+                    "
                   />
                 </div>
               </div>
@@ -719,21 +821,29 @@ const Profile = () => {
             <div className="mt-8 flex justify-end border-t border-gray-100 pt-6">
               <button
                 type="submit"
-                disabled={
-                  saving || uploading
-                }
-                className="inline-flex h-11 items-center gap-2 rounded-xl bg-green-600 px-5 text-sm font-semibold text-white transition hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-60"
+                disabled={saving || uploading}
+                className="
+                  inline-flex h-11
+                  items-center gap-2
+                  rounded-xl
+                  bg-green-600
+                  px-5
+                  text-sm font-semibold
+                  text-white
+                  transition
+                  hover:bg-green-700
+                  disabled:cursor-not-allowed
+                  disabled:opacity-60
+                "
               >
                 {saving ? (
                   <>
                     <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
-
                     Saving...
                   </>
                 ) : (
                   <>
                     <Save size={17} />
-
                     Save Changes
                   </>
                 )}

@@ -7,7 +7,10 @@ import {
   X,
   Eye,
   Loader2,
+  ArrowLeft,
+  Globe,
 } from "lucide-react";
+import { Link } from "react-router-dom";
 import useAuth from "../hooks/useAuth";
 
 const API_URL = import.meta.env.VITE_API_URL;
@@ -37,18 +40,18 @@ const MyBookings = () => {
         setError("");
 
         const email = encodeURIComponent(
-          currentUser.email.trim().toLowerCase()
+          currentUser.email.trim().toLowerCase(),
         );
 
         const response = await fetch(
-          `${API_URL}/bookings/user/${email}`
+          `${API_URL}/bookings/user/${email}`,
         );
 
         const data = await response.json();
 
         if (!response.ok) {
           throw new Error(
-            data?.message || "Failed to fetch bookings"
+            data?.message || "Failed to fetch bookings",
           );
         }
 
@@ -57,7 +60,7 @@ const MyBookings = () => {
         console.error("My bookings error:", error);
 
         setError(
-          error.message || "Failed to load your bookings."
+          error.message || "Failed to load your bookings.",
         );
 
         setBookings([]);
@@ -96,7 +99,10 @@ const MyBookings = () => {
 
     const [hours, minutes] = String(time).split(":");
 
-    if (hours === undefined || minutes === undefined) {
+    if (
+      hours === undefined ||
+      minutes === undefined
+    ) {
       return time;
     }
 
@@ -106,7 +112,7 @@ const MyBookings = () => {
       Number(hours),
       Number(minutes),
       0,
-      0
+      0,
     );
 
     return date.toLocaleTimeString("en-US", {
@@ -139,9 +145,7 @@ const MyBookings = () => {
       const bookingDate = new Date(booking.date);
       const today = new Date();
 
-      if (
-        !Number.isNaN(bookingDate.getTime())
-      ) {
+      if (!Number.isNaN(bookingDate.getTime())) {
         bookingDate.setHours(0, 0, 0, 0);
         today.setHours(0, 0, 0, 0);
 
@@ -151,7 +155,7 @@ const MyBookings = () => {
       }
     }
 
-    // pending / confirmed
+    // Pending / confirmed
     return "Upcoming";
   };
 
@@ -189,7 +193,7 @@ const MyBookings = () => {
         searchableText.includes(searchText);
 
       return matchesTab && matchesSearch;
-    }
+    },
   );
 
   // ==========================================
@@ -210,18 +214,42 @@ const MyBookings = () => {
   return (
     <main>
       {/* ================= HEADER ================= */}
-      <div>
-        <p className="text-sm font-medium text-green-600">
-          Dashboard
-        </p>
+      <div className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <p className="text-sm font-medium text-green-600">
+            Dashboard
+          </p>
 
-        <h1 className="mt-1 text-2xl font-bold text-gray-900 sm:text-3xl">
-          My Bookings
-        </h1>
+          <h1 className="mt-1 text-2xl font-bold text-gray-900 sm:text-3xl">
+            My Bookings
+          </h1>
 
-        <p className="mt-2 text-sm text-gray-500">
-          Manage and track all your turf reservations.
-        </p>
+          <p className="mt-2 text-sm text-gray-500">
+            Manage and track all your turf reservations.
+          </p>
+        </div>
+
+        {/* ACTION BUTTONS */}
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Back to Home */}
+
+          <Link
+            to="/turfs"
+            className="
+              inline-flex h-11 items-center
+              justify-center gap-2 rounded-xl
+              bg-green-600 px-5
+              text-sm font-semibold text-white
+              transition-all duration-200
+              hover:bg-green-700
+              hover:shadow-lg
+              hover:shadow-green-600/20
+            "
+          >
+            <ArrowLeft size={17} />
+            Back to Home
+          </Link>
+        </div>
       </div>
 
       {/* ================= FILTERS ================= */}
@@ -263,14 +291,15 @@ const MyBookings = () => {
               setSearch(e.target.value)
             }
             placeholder="Search bookings..."
-            className="h-11 w-full rounded-xl border border-gray-200 bg-white pl-10 pr-10 text-sm outline-none focus:border-green-500"
+            className="h-11 w-full rounded-xl border border-gray-200 bg-white pl-10 pr-10 text-sm outline-none transition focus:border-green-500 focus:ring-4 focus:ring-green-500/10"
           />
 
           {search && (
             <button
               type="button"
               onClick={() => setSearch("")}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 transition hover:text-gray-600"
+              aria-label="Clear search"
             >
               <X size={16} />
             </button>
@@ -312,7 +341,7 @@ const MyBookings = () => {
               return (
                 <article
                   key={booking._id}
-                  className="rounded-2xl border border-gray-200 bg-white p-5 sm:p-6"
+                  className="rounded-2xl border border-gray-200 bg-white p-5 transition hover:border-gray-300 sm:p-6"
                 >
                   <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
                     {/* BOOKING INFORMATION */}
@@ -321,7 +350,7 @@ const MyBookings = () => {
                       <div className="flex flex-wrap items-center gap-3">
                         <span
                           className={`rounded-full px-3 py-1 text-xs font-semibold ${getStatusStyle(
-                            displayStatus
+                            displayStatus,
                           )}`}
                         >
                           {displayStatus}
@@ -356,7 +385,7 @@ const MyBookings = () => {
                         <span className="flex items-center gap-1.5">
                           <CalendarDays size={16} />
                           {formatDate(
-                            booking.date
+                            booking.date,
                           )}
                         </span>
 
@@ -365,13 +394,13 @@ const MyBookings = () => {
                           <Clock3 size={16} />
 
                           {formatTime(
-                            booking.startTime
+                            booking.startTime,
                           )}
 
                           {" - "}
 
                           {formatTime(
-                            booking.endTime
+                            booking.endTime,
                           )}
                         </span>
                       </div>
@@ -403,7 +432,7 @@ const MyBookings = () => {
                         <p className="mt-1 text-xl font-bold text-gray-900">
                           ৳
                           {Number(
-                            booking.price || 0
+                            booking.price || 0,
                           ).toLocaleString()}
                         </p>
                       </div>
@@ -436,6 +465,16 @@ const MyBookings = () => {
                   ? "You haven't booked any turf yet."
                   : "Try changing your filters or search."}
               </p>
+
+              {bookings.length === 0 && (
+                <Link
+                  to="/"
+                  className="mt-5 inline-flex items-center gap-2 rounded-xl bg-green-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-green-700"
+                >
+                  <Globe size={16} />
+                  Visit Website
+                </Link>
+              )}
             </div>
           )}
         </div>

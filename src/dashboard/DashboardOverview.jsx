@@ -226,28 +226,7 @@ const DashboardOverview = () => {
             ================================================= */}
 
         <div className="flex flex-wrap items-center gap-3">
-          {/* Visit Website */}
-
-          <Link
-            to="/"
-            className="
-              inline-flex h-11 items-center
-              justify-center gap-2 rounded-xl
-              border border-gray-200
-              bg-white px-4
-              text-sm font-semibold text-gray-700
-              transition-all duration-200
-              hover:border-gray-300
-              hover:bg-gray-50
-              hover:text-gray-900
-            "
-          >
-            <ArrowLeft size={17} />
-
-            Visit Website
-          </Link>
-
-          {/* Find Turf */}
+          {/* Back to Home */}
 
           <Link
             to="/turfs"
@@ -262,9 +241,8 @@ const DashboardOverview = () => {
               hover:shadow-green-600/20
             "
           >
-            Find a Turf
-
-            <ArrowRight size={17} />
+            <ArrowLeft size={17} />
+            Back to Home
           </Link>
         </div>
       </div>

@@ -6,15 +6,74 @@ import {
   Camera,
   Save,
 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import Swal from "sweetalert2";
+import useAuth from "../hooks/useAuth";
+
+const API_URL = "http://localhost:3000";
 
 const Profile = () => {
+  const { currentUser, loading: authLoading } = useAuth();
+
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
   const [formData, setFormData] = useState({
-    name: "Mehedi",
-    email: "mehedi@example.com",
-    phone: "+880 1700-000000",
-    location: "Dhaka, Bangladesh",
+    name: "",
+    email: "",
+    phone: "",
+    location: "",
+    photoURL: "",
   });
+
+  // Load profile from MongoDB
+  useEffect(() => {
+    const loadProfile = async () => {
+      if (authLoading) return;
+
+      if (!currentUser?.email) {
+        setLoading(false);
+        return;
+      }
+
+      try {
+        setLoading(true);
+
+        const response = await fetch(
+          `${API_URL}/users/${encodeURIComponent(currentUser.email)}`
+        );
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.message || "Failed to load profile");
+        }
+
+        const user = data.user;
+
+        setFormData({
+          name: user.name || currentUser.displayName || "",
+          email: user.email || currentUser.email || "",
+          phone: user.phone || "",
+          location: user.location || "",
+          photoURL: user.photoURL || currentUser.photoURL || "",
+        });
+      } catch (error) {
+        console.error("Load profile error:", error);
+
+        Swal.fire({
+          icon: "error",
+          title: "Failed to load profile",
+          text: error.message || "Something went wrong.",
+          confirmButtonColor: "#16a34a",
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadProfile();
+  }, [currentUser, authLoading]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -25,14 +84,141 @@ const Profile = () => {
     }));
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
 
-    console.log("Profile updated:", formData);
+    if (!currentUser?.email) {
+      Swal.fire({
+        icon: "warning",
+        title: "Not logged in",
+        text: "Please login first.",
+        confirmButtonColor: "#16a34a",
+      });
+
+      return;
+    }
+
+    if (!formData.name.trim()) {
+      Swal.fire({
+        icon: "warning",
+        title: "Name required",
+        text: "Please enter your full name.",
+        confirmButtonColor: "#16a34a",
+      });
+
+      return;
+    }
+
+    try {
+      setSaving(true);
+
+      const response = await fetch(
+        `${API_URL}/users/${encodeURIComponent(currentUser.email)}`,
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            name: formData.name,
+            phone: formData.phone,
+            location: formData.location,
+            photoURL: formData.photoURL,
+          }),
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || "Failed to update profile");
+      }
+
+      const updatedUser = data.user;
+
+      setFormData({
+        name: updatedUser.name || "",
+        email: updatedUser.email || currentUser.email || "",
+        phone: updatedUser.phone || "",
+        location: updatedUser.location || "",
+        photoURL: updatedUser.photoURL || "",
+      });
+
+      Swal.fire({
+        icon: "success",
+        title: "Profile Updated",
+        text: "Your profile has been updated successfully.",
+        confirmButtonColor: "#16a34a",
+        timer: 1800,
+        showConfirmButton: false,
+      });
+    } catch (error) {
+      console.error("Update profile error:", error);
+
+      Swal.fire({
+        icon: "error",
+        title: "Update failed",
+        text: error.message || "Something went wrong.",
+        confirmButtonColor: "#16a34a",
+      });
+    } finally {
+      setSaving(false);
+    }
   };
+
+  // Auth loading
+  if (authLoading) {
+    return (
+      <main className="flex min-h-[60vh] items-center justify-center">
+        <div className="text-center">
+          <div className="mx-auto h-10 w-10 animate-spin rounded-full border-4 border-green-100 border-t-green-600" />
+
+          <p className="mt-4 text-sm text-gray-500">
+            Loading your profile...
+          </p>
+        </div>
+      </main>
+    );
+  }
+
+  // Not logged in
+  if (!currentUser) {
+    return (
+      <main className="flex min-h-[60vh] items-center justify-center">
+        <div className="text-center">
+          <h2 className="text-xl font-bold text-gray-900">
+            Please login first
+          </h2>
+
+          <p className="mt-2 text-sm text-gray-500">
+            You need to be logged in to view your profile.
+          </p>
+        </div>
+      </main>
+    );
+  }
+
+  // MongoDB profile loading
+  if (loading) {
+    return (
+      <main className="flex min-h-[60vh] items-center justify-center">
+        <div className="text-center">
+          <div className="mx-auto h-10 w-10 animate-spin rounded-full border-4 border-green-100 border-t-green-600" />
+
+          <p className="mt-4 text-sm text-gray-500">
+            Loading your profile...
+          </p>
+        </div>
+      </main>
+    );
+  }
+
+  const profileInitial =
+    formData.name?.trim()?.charAt(0)?.toUpperCase() || "U";
 
   return (
     <main>
+      {/* Header */}
       <div>
         <p className="text-sm font-medium text-green-600">
           Dashboard
@@ -52,20 +238,28 @@ const Profile = () => {
         <aside className="h-fit rounded-2xl border border-gray-200 bg-white p-6">
           <div className="flex flex-col items-center text-center">
             <div className="relative">
-              <div className="flex h-24 w-24 items-center justify-center rounded-full bg-green-100 text-3xl font-bold text-green-700">
-                M
-              </div>
+              {formData.photoURL ? (
+                <img
+                  src={formData.photoURL}
+                  alt={formData.name || "Profile"}
+                  className="h-24 w-24 rounded-full object-cover ring-4 ring-green-50"
+                />
+              ) : (
+                <div className="flex h-24 w-24 items-center justify-center rounded-full bg-green-100 text-3xl font-bold text-green-700">
+                  {profileInitial}
+                </div>
+              )}
 
               <button
                 type="button"
-                className="absolute bottom-0 right-0 flex h-9 w-9 items-center justify-center rounded-full border-2 border-white bg-green-600 text-white shadow-sm"
+                className="absolute bottom-0 right-0 flex h-9 w-9 items-center justify-center rounded-full border-2 border-white bg-green-600 text-white shadow-sm transition hover:bg-green-700"
               >
                 <Camera size={16} />
               </button>
             </div>
 
             <h2 className="mt-4 font-bold text-gray-900">
-              {formData.name}
+              {formData.name || "User"}
             </h2>
 
             <p className="mt-1 text-sm text-gray-500">
@@ -76,21 +270,40 @@ const Profile = () => {
           <div className="my-6 h-px bg-gray-100" />
 
           <div className="space-y-4 text-sm">
+            {/* Email */}
             <div className="flex items-center gap-3 text-gray-500">
-              <Mail size={17} className="text-green-600" />
+              <Mail
+                size={17}
+                className="shrink-0 text-green-600"
+              />
+
               <span className="truncate">
                 {formData.email}
               </span>
             </div>
 
+            {/* Phone */}
             <div className="flex items-center gap-3 text-gray-500">
-              <Phone size={17} className="text-green-600" />
-              <span>{formData.phone}</span>
+              <Phone
+                size={17}
+                className="shrink-0 text-green-600"
+              />
+
+              <span>
+                {formData.phone || "No phone added"}
+              </span>
             </div>
 
+            {/* Location */}
             <div className="flex items-center gap-3 text-gray-500">
-              <MapPin size={17} className="text-green-600" />
-              <span>{formData.location}</span>
+              <MapPin
+                size={17}
+                className="shrink-0 text-green-600"
+              />
+
+              <span>
+                {formData.location || "No location added"}
+              </span>
             </div>
           </div>
         </aside>
@@ -114,7 +327,10 @@ const Profile = () => {
             <div className="grid gap-5 sm:grid-cols-2">
               {/* Name */}
               <div className="sm:col-span-2">
-                <label className="mb-2 block text-sm font-medium text-gray-700">
+                <label
+                  htmlFor="name"
+                  className="mb-2 block text-sm font-medium text-gray-700"
+                >
                   Full Name
                 </label>
 
@@ -125,10 +341,12 @@ const Profile = () => {
                   />
 
                   <input
+                    id="name"
                     type="text"
                     name="name"
                     value={formData.name}
                     onChange={handleChange}
+                    placeholder="Enter your full name"
                     className="h-12 w-full rounded-xl border border-gray-200 pl-10 pr-4 text-sm outline-none transition focus:border-green-500 focus:ring-4 focus:ring-green-500/10"
                   />
                 </div>
@@ -136,7 +354,10 @@ const Profile = () => {
 
               {/* Email */}
               <div>
-                <label className="mb-2 block text-sm font-medium text-gray-700">
+                <label
+                  htmlFor="email"
+                  className="mb-2 block text-sm font-medium text-gray-700"
+                >
                   Email Address
                 </label>
 
@@ -147,18 +368,25 @@ const Profile = () => {
                   />
 
                   <input
+                    id="email"
                     type="email"
-                    name="email"
                     value={formData.email}
-                    onChange={handleChange}
-                    className="h-12 w-full rounded-xl border border-gray-200 pl-10 pr-4 text-sm outline-none transition focus:border-green-500 focus:ring-4 focus:ring-green-500/10"
+                    disabled
+                    className="h-12 w-full cursor-not-allowed rounded-xl border border-gray-200 bg-gray-50 pl-10 pr-4 text-sm text-gray-500 outline-none"
                   />
                 </div>
+
+                <p className="mt-1.5 text-xs text-gray-400">
+                  Email cannot be changed here.
+                </p>
               </div>
 
               {/* Phone */}
               <div>
-                <label className="mb-2 block text-sm font-medium text-gray-700">
+                <label
+                  htmlFor="phone"
+                  className="mb-2 block text-sm font-medium text-gray-700"
+                >
                   Phone Number
                 </label>
 
@@ -169,10 +397,12 @@ const Profile = () => {
                   />
 
                   <input
+                    id="phone"
                     type="tel"
                     name="phone"
                     value={formData.phone}
                     onChange={handleChange}
+                    placeholder="+880 1XXXXXXXXX"
                     className="h-12 w-full rounded-xl border border-gray-200 pl-10 pr-4 text-sm outline-none transition focus:border-green-500 focus:ring-4 focus:ring-green-500/10"
                   />
                 </div>
@@ -180,7 +410,10 @@ const Profile = () => {
 
               {/* Location */}
               <div className="sm:col-span-2">
-                <label className="mb-2 block text-sm font-medium text-gray-700">
+                <label
+                  htmlFor="location"
+                  className="mb-2 block text-sm font-medium text-gray-700"
+                >
                   Location
                 </label>
 
@@ -191,23 +424,36 @@ const Profile = () => {
                   />
 
                   <input
+                    id="location"
                     type="text"
                     name="location"
                     value={formData.location}
                     onChange={handleChange}
+                    placeholder="Dhaka, Bangladesh"
                     className="h-12 w-full rounded-xl border border-gray-200 pl-10 pr-4 text-sm outline-none transition focus:border-green-500 focus:ring-4 focus:ring-green-500/10"
                   />
                 </div>
               </div>
             </div>
 
+            {/* Save */}
             <div className="mt-8 flex justify-end border-t border-gray-100 pt-6">
               <button
                 type="submit"
-                className="inline-flex h-11 items-center gap-2 rounded-xl bg-green-600 px-5 text-sm font-semibold text-white transition hover:bg-green-700"
+                disabled={saving}
+                className="inline-flex h-11 items-center gap-2 rounded-xl bg-green-600 px-5 text-sm font-semibold text-white transition hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-60"
               >
-                <Save size={17} />
-                Save Changes
+                {saving ? (
+                  <>
+                    <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <Save size={17} />
+                    Save Changes
+                  </>
+                )}
               </button>
             </div>
           </form>

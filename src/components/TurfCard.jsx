@@ -17,6 +17,36 @@ const API_URL = (
 const FALLBACK_IMAGE =
   "https://placehold.co/800x600?text=No+Turf+Image";
 
+const getTurfId = (turf) => {
+  if (!turf) return "";
+
+  // MongoDB ObjectId serialized normally
+  if (typeof turf._id === "string") {
+    return turf._id.trim();
+  }
+
+  // MongoDB ObjectId serialized as {$oid: "..."}
+  if (
+    turf._id &&
+    typeof turf._id === "object" &&
+    typeof turf._id.$oid === "string"
+  ) {
+    return turf._id.$oid.trim();
+  }
+
+  // Other possible backend field
+  if (typeof turf.turfId === "string") {
+    return turf.turfId.trim();
+  }
+
+  // Fallback for local/static data
+  if (typeof turf.id === "string") {
+    return turf.id.trim();
+  }
+
+  return "";
+};
+
 const TurfCard = ({ turf }) => {
   const { currentUser } = useAuth();
 
@@ -25,19 +55,7 @@ const TurfCard = ({ turf }) => {
   const [wishlistChecking, setWishlistChecking] = useState(false);
   const [wishlistAnimation, setWishlistAnimation] = useState(false);
 
-  // =====================================================
-  // TURF ID
-  // =====================================================
-
-  const turfId = turf?._id
-    ? String(turf._id)
-    : turf?.id
-    ? String(turf.id)
-    : "";
-
-  // =====================================================
-  // TURF DATA
-  // =====================================================
+  const turfId = getTurfId(turf);
 
   const turfName = turf?.name || "Unnamed Turf";
 
@@ -65,17 +83,9 @@ const TurfCard = ({ turf }) => {
 
   const turfSurface = turf?.surface || "";
 
-  // =====================================================
-  // USER EMAIL
-  // =====================================================
-
   const userEmail = currentUser?.email
     ? String(currentUser.email).trim().toLowerCase()
     : "";
-
-  // =====================================================
-  // CHECK WISHLIST STATUS
-  // =====================================================
 
   useEffect(() => {
     let mounted = true;
@@ -93,17 +103,13 @@ const TurfCard = ({ turf }) => {
       try {
         setWishlistChecking(true);
 
-        const url = `${API_URL}/wishlist/${encodeURIComponent(
-          userEmail
-        )}/${encodeURIComponent(turfId)}`;
-
-        console.log("🔎 Checking wishlist:", url);
-
-        const response = await fetch(url);
+        const response = await fetch(
+          `${API_URL}/wishlist/${encodeURIComponent(
+            userEmail
+          )}/${encodeURIComponent(turfId)}`
+        );
 
         const data = await response.json();
-
-        console.log("🔎 Wishlist status:", data);
 
         if (!response.ok) {
           throw new Error(
@@ -117,7 +123,7 @@ const TurfCard = ({ turf }) => {
         }
       } catch (error) {
         console.error(
-          "❌ Wishlist status error:",
+          "Wishlist status error:",
           error
         );
 
@@ -138,19 +144,9 @@ const TurfCard = ({ turf }) => {
     };
   }, [userEmail, turfId]);
 
-  // =====================================================
-  // WISHLIST CLICK
-  // =====================================================
-
   const handleWishlist = async (event) => {
     event.preventDefault();
     event.stopPropagation();
-
-    console.log("❤️ Wishlist button clicked");
-
-    // ---------------------------------------------------
-    // LOGIN CHECK
-    // ---------------------------------------------------
 
     if (!userEmail) {
       await Swal.fire({
@@ -163,13 +159,7 @@ const TurfCard = ({ turf }) => {
       return;
     }
 
-    // ---------------------------------------------------
-    // TURF ID CHECK
-    // ---------------------------------------------------
-
     if (!turfId) {
-      console.error("❌ Turf ID missing:", turf);
-
       await Swal.fire({
         icon: "error",
         title: "Invalid turf",
@@ -180,10 +170,6 @@ const TurfCard = ({ turf }) => {
       return;
     }
 
-    // ---------------------------------------------------
-    // PREVENT DOUBLE CLICK
-    // ---------------------------------------------------
-
     if (wishlistLoading || wishlistChecking) {
       return;
     }
@@ -191,29 +177,21 @@ const TurfCard = ({ turf }) => {
     try {
       setWishlistLoading(true);
 
-      const url = `${API_URL}/wishlist/toggle`;
-
-      const payload = {
-        userEmail,
-        turfId,
-      };
-
-      console.log("🚀 Wishlist request:", {
-        url,
-        payload,
-      });
-
-      const response = await fetch(url, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(payload),
-      });
+      const response = await fetch(
+        `${API_URL}/wishlist/toggle`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            userEmail,
+            turfId,
+          }),
+        }
+      );
 
       const data = await response.json();
-
-      console.log("📦 Wishlist response:", data);
 
       if (!response.ok) {
         throw new Error(
@@ -226,10 +204,6 @@ const TurfCard = ({ turf }) => {
 
       setIsWishlisted(newStatus);
 
-      // -------------------------------------------------
-      // ANIMATION
-      // -------------------------------------------------
-
       if (newStatus) {
         setWishlistAnimation(true);
 
@@ -237,10 +211,6 @@ const TurfCard = ({ turf }) => {
           setWishlistAnimation(false);
         }, 600);
       }
-
-      // -------------------------------------------------
-      // SUCCESS TOAST
-      // -------------------------------------------------
 
       await Swal.fire({
         toast: true,
@@ -260,7 +230,7 @@ const TurfCard = ({ turf }) => {
       });
     } catch (error) {
       console.error(
-        "❌ Wishlist request failed:",
+        "Wishlist request failed:",
         error
       );
 
@@ -277,21 +247,11 @@ const TurfCard = ({ turf }) => {
     }
   };
 
-  // =====================================================
-  // IMAGE ERROR
-  // =====================================================
-
   const handleImageError = (event) => {
-    if (
-      event.currentTarget.src !== FALLBACK_IMAGE
-    ) {
+    if (event.currentTarget.src !== FALLBACK_IMAGE) {
       event.currentTarget.src = FALLBACK_IMAGE;
     }
   };
-
-  // =====================================================
-  // RENDER
-  // =====================================================
 
   return (
     <article
@@ -310,18 +270,8 @@ const TurfCard = ({ turf }) => {
         hover:shadow-gray-100
       "
     >
-      {/* =================================================
-          IMAGE
-          ================================================= */}
-
-      <div
-        className="
-          relative
-          aspect-[4/3]
-          overflow-hidden
-          bg-gray-100
-        "
-      >
+      {/* Image */}
+      <div className="relative aspect-[4/3] overflow-hidden bg-gray-100">
         <img
           src={turfImage}
           alt={turfName}
@@ -337,8 +287,7 @@ const TurfCard = ({ turf }) => {
           onError={handleImageError}
         />
 
-        {/* TOP OVERLAY */}
-
+        {/* Top overlay */}
         <div
           className="
             absolute
@@ -351,8 +300,6 @@ const TurfCard = ({ turf }) => {
             p-4
           "
         >
-          {/* SPORT */}
-
           <span
             className="
               rounded-full
@@ -369,13 +316,12 @@ const TurfCard = ({ turf }) => {
             {turfSport}
           </span>
 
-          {/* WISHLIST */}
-
           <button
             type="button"
             onClick={handleWishlist}
             disabled={
-              wishlistLoading || wishlistChecking
+              wishlistLoading ||
+              wishlistChecking
             }
             aria-label={
               isWishlisted
@@ -390,7 +336,6 @@ const TurfCard = ({ turf }) => {
               h-10
               w-10
               shrink-0
-              cursor-pointer
               items-center
               justify-center
               rounded-full
@@ -403,13 +348,11 @@ const TurfCard = ({ turf }) => {
               active:scale-90
               disabled:cursor-not-allowed
               disabled:opacity-70
-
               ${
                 isWishlisted
                   ? "text-red-500"
                   : "text-gray-600 hover:text-red-500"
               }
-
               ${
                 wishlistAnimation
                   ? "scale-125"
@@ -430,26 +373,16 @@ const TurfCard = ({ turf }) => {
               />
             )}
 
-            {wishlistLoading ||
-            wishlistChecking ? (
+            {wishlistLoading || wishlistChecking ? (
               <Loader2
                 size={18}
-                className="
-                  relative
-                  z-10
-                  animate-spin
-                "
+                className="relative z-10 animate-spin"
               />
             ) : (
               <Heart
                 size={18}
                 strokeWidth={2}
-                className="
-                  relative
-                  z-10
-                  transition-transform
-                  duration-200
-                "
+                className="relative z-10"
                 fill={
                   isWishlisted
                     ? "currentColor"
@@ -460,16 +393,8 @@ const TurfCard = ({ turf }) => {
           </button>
         </div>
 
-        {/* AVAILABILITY */}
-
-        <div
-          className="
-            absolute
-            bottom-4
-            left-4
-            z-10
-          "
-        >
+        {/* Availability */}
+        <div className="absolute bottom-4 left-4 z-10">
           <span
             className="
               rounded-full
@@ -487,43 +412,19 @@ const TurfCard = ({ turf }) => {
         </div>
       </div>
 
-      {/* =================================================
-          CONTENT
-          ================================================= */}
-
+      {/* Content */}
       <div className="p-5">
-        {/* NAME + RATING */}
-
-        <div
-          className="
-            flex
-            items-start
-            justify-between
-            gap-3
-          "
-        >
+        {/* Name + rating */}
+        <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <h3
-              className="
-                truncate
-                font-semibold
-                text-gray-900
-              "
+              className="truncate font-semibold text-gray-900"
               title={turfName}
             >
               {turfName}
             </h3>
 
-            <div
-              className="
-                mt-2
-                flex
-                items-center
-                gap-1.5
-                text-xs
-                text-gray-500
-              "
-            >
+            <div className="mt-2 flex items-center gap-1.5 text-xs text-gray-500">
               <MapPin
                 size={14}
                 className="shrink-0"
@@ -538,8 +439,7 @@ const TurfCard = ({ turf }) => {
             </div>
           </div>
 
-          {/* RATING */}
-
+          {/* Rating */}
           <div
             className="
               flex
@@ -568,143 +468,101 @@ const TurfCard = ({ turf }) => {
           </div>
         </div>
 
-        {/* TURF INFO */}
-
-        {(turfArea ||
-          turfSize ||
-          turfSurface) && (
+        {/* Turf info */}
+        {(turfArea || turfSize || turfSurface) && (
           <div className="mt-4 flex flex-wrap gap-2">
             {turfArea && (
-              <span
-                className="
-                  rounded-md
-                  bg-gray-50
-                  px-2
-                  py-1
-                  text-[11px]
-                  text-gray-500
-                "
-              >
+              <span className="rounded-md bg-gray-50 px-2 py-1 text-[11px] text-gray-500">
                 {turfArea}
               </span>
             )}
 
             {turfSize && (
-              <span
-                className="
-                  rounded-md
-                  bg-gray-50
-                  px-2
-                  py-1
-                  text-[11px]
-                  text-gray-500
-                "
-              >
+              <span className="rounded-md bg-gray-50 px-2 py-1 text-[11px] text-gray-500">
                 {turfSize}
               </span>
             )}
 
             {turfSurface && (
-              <span
-                className="
-                  rounded-md
-                  bg-gray-50
-                  px-2
-                  py-1
-                  text-[11px]
-                  text-gray-500
-                "
-              >
+              <span className="rounded-md bg-gray-50 px-2 py-1 text-[11px] text-gray-500">
                 {turfSurface}
               </span>
             )}
           </div>
         )}
 
-        {/* DIVIDER */}
+        <div className="my-4 border-t border-gray-100" />
 
-        <div
-          className="
-            my-4
-            border-t
-            border-gray-100
-          "
-        />
-
-        {/* PRICE + DETAILS */}
-
-        <div
-          className="
-            flex
-            items-end
-            justify-between
-            gap-4
-          "
-        >
-          {/* PRICE */}
-
+        {/* Price + details */}
+        <div className="flex items-end justify-between gap-4">
           <div>
             <p className="text-xs text-gray-400">
               Starting from
             </p>
 
-            <p
-              className="
-                mt-1
-                text-lg
-                font-bold
-                text-gray-900
-              "
-            >
+            <p className="mt-1 text-lg font-bold text-gray-900">
               ৳{turfPrice.toLocaleString()}
 
-              <span
-                className="
-                  ml-1
-                  text-xs
-                  font-normal
-                  text-gray-400
-                "
-              >
+              <span className="ml-1 text-xs font-normal text-gray-400">
                 / hour
               </span>
             </p>
           </div>
 
-          {/* DETAILS */}
-
-          <Link
-            to={`/turfs/${turfId}`}
-            aria-label={`View details for ${turfName}`}
-            className="
-              group/link
-              inline-flex
-              shrink-0
-              items-center
-              gap-1.5
-              rounded-lg
-              bg-gray-900
-              px-3.5
-              py-2.5
-              text-xs
-              font-semibold
-              text-white
-              transition-all
-              duration-200
-              hover:bg-green-600
-            "
-          >
-            View details
-
-            <ArrowUpRight
-              size={14}
+          {turfId ? (
+            <Link
+              to={`/turfs/${encodeURIComponent(turfId)}`}
+              aria-label={`View details for ${turfName}`}
               className="
-                transition-transform
-                group-hover/link:-translate-y-0.5
-                group-hover/link:translate-x-0.5
+                group/link
+                inline-flex
+                shrink-0
+                items-center
+                gap-1.5
+                rounded-lg
+                bg-gray-900
+                px-3.5
+                py-2.5
+                text-xs
+                font-semibold
+                text-white
+                transition-all
+                duration-200
+                hover:bg-green-600
               "
-            />
-          </Link>
+            >
+              View details
+
+              <ArrowUpRight
+                size={14}
+                className="
+                  transition-transform
+                  group-hover/link:-translate-y-0.5
+                  group-hover/link:translate-x-0.5
+                "
+              />
+            </Link>
+          ) : (
+            <span
+              className="
+                inline-flex
+                shrink-0
+                items-center
+                gap-1.5
+                rounded-lg
+                bg-gray-200
+                px-3.5
+                py-2.5
+                text-xs
+                font-semibold
+                text-gray-400
+                cursor-not-allowed
+              "
+              title="Turf ID is missing"
+            >
+              Details unavailable
+            </span>
+          )}
         </div>
       </div>
     </article>

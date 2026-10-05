@@ -10,6 +10,7 @@ import {
   Users,
   CalendarDays,
   ShieldCheck,
+  AlertCircle,
   Loader2,
 } from "lucide-react";
 
@@ -31,25 +32,26 @@ const TurfDetails = () => {
     let mounted = true;
 
     const fetchTurf = async () => {
-      if (!id) {
-        setError("Invalid turf ID.");
-        setLoading(false);
-        return;
-      }
-
       try {
         setLoading(true);
         setError("");
+        setTurf(null);
+
+        const turfId = String(id || "").trim();
+
+        if (!turfId) {
+          throw new Error("Turf ID is missing.");
+        }
 
         const response = await fetch(
-          `${API_URL}/turfs/${encodeURIComponent(id)}`
+          `${API_URL}/turfs/${encodeURIComponent(turfId)}`
         );
 
         const data = await response.json();
 
         if (!response.ok) {
           throw new Error(
-            data?.message || "Failed to load turf."
+            data?.message || "Failed to load turf details."
           );
         }
 
@@ -57,13 +59,14 @@ const TurfDetails = () => {
           setTurf(data);
         }
       } catch (error) {
-        console.error("Failed to fetch turf:", error);
+        console.error("Fetch turf details:", error);
 
         if (mounted) {
           setError(
             error?.message ||
-              "Unable to load this turf."
+              "Failed to load turf details."
           );
+          setTurf(null);
         }
       } finally {
         if (mounted) {
@@ -79,42 +82,47 @@ const TurfDetails = () => {
     };
   }, [id]);
 
-  // =====================================================
-  // LOADING
-  // =====================================================
+  const handleImageError = (event) => {
+    if (event.currentTarget.src !== FALLBACK_IMAGE) {
+      event.currentTarget.src = FALLBACK_IMAGE;
+    }
+  };
 
   if (loading) {
     return (
-      <main className="flex min-h-[70vh] items-center justify-center bg-gray-50">
+      <main className="flex min-h-[70vh] items-center justify-center bg-gray-50 px-4">
         <div className="flex flex-col items-center">
           <Loader2
-            size={32}
+            size={30}
             className="animate-spin text-green-600"
           />
 
           <p className="mt-4 text-sm text-gray-500">
-            Loading turf...
+            Loading turf details...
           </p>
         </div>
       </main>
     );
   }
 
-  // =====================================================
-  // ERROR / NOT FOUND
-  // =====================================================
-
-  if (error || !turf) {
+  if (!turf) {
     return (
       <main className="flex min-h-[70vh] items-center justify-center bg-gray-50 px-4">
-        <div className="text-center">
-          <h1 className="text-3xl font-bold text-gray-900">
+        <div className="max-w-md text-center">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-red-50">
+            <AlertCircle
+              size={26}
+              className="text-red-500"
+            />
+          </div>
+
+          <h1 className="mt-5 text-2xl font-bold text-gray-900">
             Turf not found
           </h1>
 
-          <p className="mt-3 text-sm text-gray-500">
+          <p className="mt-3 text-sm leading-6 text-gray-500">
             {error ||
-              "The turf you are looking for does not exist."}
+              "The turf you are looking for does not exist or is no longer available."}
           </p>
 
           <Link
@@ -129,11 +137,7 @@ const TurfDetails = () => {
     );
   }
 
-  // =====================================================
-  // NORMALIZE DATA
-  // =====================================================
-
-  const turfId = String(turf._id || turf.id || "");
+  const turfId = String(turf?._id || turf?.id || "");
 
   const turfName = turf.name || "Unnamed Turf";
 
@@ -142,10 +146,8 @@ const TurfDetails = () => {
 
   const turfLocation =
     turf.location ||
-    `${turf.area || "Dhaka"}, Dhaka`;
-
-  const turfArea =
-    turf.area || turf.location || "Dhaka";
+    turf.area ||
+    "Dhaka, Bangladesh";
 
   const turfSport =
     turf.sport || "Sports Turf";
@@ -154,11 +156,11 @@ const TurfDetails = () => {
     turf.rating !== undefined &&
     turf.rating !== null &&
     turf.rating !== ""
-      ? turf.rating
+      ? Number(turf.rating).toFixed(1)
       : "New";
 
   const turfReviews =
-    turf.reviews || turf.reviewCount || 0;
+    Number(turf.reviews) || 0;
 
   const turfPrice =
     Number(turf.price) || 0;
@@ -179,34 +181,22 @@ const TurfDetails = () => {
     turf.description ||
     "A quality sports turf where you can enjoy your game with friends and teammates.";
 
-  const amenities =
-    Array.isArray(turf.amenities) &&
-    turf.amenities.length > 0
-      ? turf.amenities
-      : [
-          "Floodlights",
-          "Parking",
-          "Changing Room",
-          "Washroom",
-        ];
-
-  // =====================================================
-  // IMAGE ERROR
-  // =====================================================
-
-  const handleImageError = (event) => {
-    if (event.currentTarget.src !== FALLBACK_IMAGE) {
-      event.currentTarget.src = FALLBACK_IMAGE;
-    }
-  };
-
-  // =====================================================
-  // RENDER
-  // =====================================================
+  const facilities =
+    Array.isArray(turf.facilities) &&
+    turf.facilities.length > 0
+      ? turf.facilities
+      : Array.isArray(turf.amenities) &&
+          turf.amenities.length > 0
+        ? turf.amenities
+        : [
+            "Floodlights",
+            "Parking",
+            "Changing Room",
+            "Washroom",
+          ];
 
   return (
     <main className="bg-gray-50">
-      {/* Breadcrumb */}
       <section className="border-b border-gray-200 bg-white">
         <div className="mx-auto max-w-7xl px-4 py-4 sm:px-6 lg:px-8">
           <Link
@@ -219,28 +209,22 @@ const TurfDetails = () => {
         </div>
       </section>
 
-      {/* Main */}
       <section className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 lg:py-10">
         <div className="grid gap-8 lg:grid-cols-[1.5fr_1fr]">
-          {/* =================================================
-              LEFT
-          ================================================= */}
-
           <div>
-            {/* Image */}
             <div className="overflow-hidden rounded-2xl bg-gray-200">
               <img
                 src={turfImage}
-                alt={turfName}
+                alt={`${turfName} turf`}
                 onError={handleImageError}
+                loading="eager"
                 className="h-[280px] w-full object-cover sm:h-[400px] lg:h-[470px]"
               />
             </div>
 
-            {/* Information */}
             <div className="mt-6 rounded-2xl border border-gray-200 bg-white p-6 sm:p-8">
-              <div className="flex flex-wrap items-start justify-between gap-4">
-                <div>
+              <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
+                <div className="min-w-0">
                   <div className="mb-3 inline-flex items-center rounded-full bg-green-50 px-3 py-1 text-xs font-semibold text-green-700">
                     {turfSport}
                   </div>
@@ -249,18 +233,17 @@ const TurfDetails = () => {
                     {turfName}
                   </h1>
 
-                  <div className="mt-3 flex items-center gap-2 text-sm text-gray-500">
+                  <div className="mt-3 flex items-start gap-2 text-sm text-gray-500">
                     <MapPin
                       size={17}
-                      className="shrink-0 text-green-600"
+                      className="mt-0.5 shrink-0 text-green-600"
                     />
 
-                    {turfLocation}
+                    <span>{turfLocation}</span>
                   </div>
                 </div>
 
-                {/* Rating */}
-                <div className="flex items-center gap-2">
+                <div className="flex shrink-0 items-center gap-2">
                   <Star
                     size={18}
                     className="fill-yellow-400 text-yellow-400"
@@ -278,16 +261,16 @@ const TurfDetails = () => {
 
               <div className="my-7 h-px bg-gray-100" />
 
-              {/* About */}
-              <h2 className="text-lg font-semibold text-gray-900">
-                About this turf
-              </h2>
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900">
+                  About this turf
+                </h2>
 
-              <p className="mt-3 text-sm leading-7 text-gray-500">
-                {description}
-              </p>
+                <p className="mt-3 text-sm leading-7 text-gray-500">
+                  {description}
+                </p>
+              </div>
 
-              {/* Turf Specs */}
               <div className="mt-8 grid gap-4 sm:grid-cols-3">
                 <div className="rounded-xl bg-gray-50 p-4">
                   <Users
@@ -335,16 +318,15 @@ const TurfDetails = () => {
                 </div>
               </div>
 
-              {/* Amenities */}
               <div className="mt-8">
                 <h2 className="text-lg font-semibold text-gray-900">
-                  Amenities
+                  Facilities
                 </h2>
 
                 <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                  {amenities.map((amenity, index) => (
+                  {facilities.map((facility, index) => (
                     <div
-                      key={`${amenity}-${index}`}
+                      key={`${facility}-${index}`}
                       className="flex items-center gap-2 text-sm text-gray-600"
                     >
                       <CheckCircle2
@@ -352,7 +334,7 @@ const TurfDetails = () => {
                         className="shrink-0 text-green-600"
                       />
 
-                      {amenity}
+                      <span>{facility}</span>
                     </div>
                   ))}
                 </div>
@@ -360,13 +342,9 @@ const TurfDetails = () => {
             </div>
           </div>
 
-          {/* =================================================
-              BOOKING CARD
-          ================================================= */}
-
           <div>
             <div className="sticky top-24 rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
-              <div className="flex items-end justify-between">
+              <div className="flex items-end justify-between gap-4">
                 <div>
                   <p className="text-sm text-gray-500">
                     Starting from
@@ -398,13 +376,12 @@ const TurfDetails = () => {
               <div className="my-6 h-px bg-gray-100" />
 
               <div className="space-y-4">
-                {/* Availability */}
                 <div className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-green-50 text-green-600">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-green-50 text-green-600">
                     <CalendarDays size={19} />
                   </div>
 
-                  <div>
+                  <div className="min-w-0">
                     <p className="text-xs text-gray-400">
                       Availability
                     </p>
@@ -418,9 +395,8 @@ const TurfDetails = () => {
                   </div>
                 </div>
 
-                {/* Opening Hours */}
                 <div className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-green-50 text-green-600">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-green-50 text-green-600">
                     <Clock3 size={19} />
                   </div>
 
@@ -435,36 +411,34 @@ const TurfDetails = () => {
                   </div>
                 </div>
 
-                {/* Location */}
                 <div className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-green-50 text-green-600">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-green-50 text-green-600">
                     <MapPin size={19} />
                   </div>
 
-                  <div>
+                  <div className="min-w-0">
                     <p className="text-xs text-gray-400">
                       Location
                     </p>
 
                     <p className="text-sm font-medium text-gray-900">
-                      {turfArea}, Dhaka
+                      {turfLocation}
                     </p>
                   </div>
                 </div>
               </div>
 
-              {/* CTA */}
               <Link
                 to={`/turfs/${turfId}/book`}
-                className="mt-7 flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-green-600 text-sm font-semibold text-white transition hover:bg-green-500"
+                className="mt-7 flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-green-600 text-sm font-semibold text-white transition hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2"
               >
                 Check Availability
                 <ArrowRight size={17} />
               </Link>
 
               <p className="mt-4 text-center text-xs leading-5 text-gray-400">
-                Select your preferred date and time to see available
-                slots.
+                Select your preferred date and time to
+                see available slots.
               </p>
             </div>
           </div>

@@ -8,6 +8,7 @@ import {
   Loader2,
 } from "lucide-react";
 import Swal from "sweetalert2";
+
 import useAuth from "../hooks/useAuth";
 
 const API_URL = (
@@ -20,12 +21,14 @@ const FALLBACK_IMAGE =
 const getTurfId = (turf) => {
   if (!turf) return "";
 
-  // MongoDB ObjectId serialized normally
-  if (typeof turf._id === "string") {
+  if (typeof turf.id === "string" && turf.id.trim()) {
+    return turf.id.trim();
+  }
+
+  if (typeof turf._id === "string" && turf._id.trim()) {
     return turf._id.trim();
   }
 
-  // MongoDB ObjectId serialized as {$oid: "..."}
   if (
     turf._id &&
     typeof turf._id === "object" &&
@@ -34,14 +37,8 @@ const getTurfId = (turf) => {
     return turf._id.$oid.trim();
   }
 
-  // Other possible backend field
-  if (typeof turf.turfId === "string") {
+  if (typeof turf.turfId === "string" && turf.turfId.trim()) {
     return turf.turfId.trim();
-  }
-
-  // Fallback for local/static data
-  if (typeof turf.id === "string") {
-    return turf.id.trim();
   }
 
   return "";
@@ -59,16 +56,18 @@ const TurfCard = ({ turf }) => {
 
   const turfName = turf?.name || "Unnamed Turf";
 
-  const turfImage = turf?.image || FALLBACK_IMAGE;
+  const turfImage =
+    typeof turf?.image === "string" && turf.image.trim()
+      ? turf.image.trim()
+      : FALLBACK_IMAGE;
 
   const turfLocation =
-    turf?.location ||
-    turf?.area ||
-    "Dhaka, Bangladesh";
+    turf?.location || turf?.area || "Dhaka, Bangladesh";
 
   const turfArea = turf?.area || "";
-
   const turfSport = turf?.sport || "Sports Turf";
+  const turfSize = turf?.size || "";
+  const turfSurface = turf?.surface || "";
 
   const turfRating =
     turf?.rating !== undefined &&
@@ -78,10 +77,6 @@ const TurfCard = ({ turf }) => {
       : "New";
 
   const turfPrice = Number(turf?.price) || 0;
-
-  const turfSize = turf?.size || "";
-
-  const turfSurface = turf?.surface || "";
 
   const userEmail = currentUser?.email
     ? String(currentUser.email).trim().toLowerCase()
@@ -113,8 +108,7 @@ const TurfCard = ({ turf }) => {
 
         if (!response.ok) {
           throw new Error(
-            data?.message ||
-              "Failed to check wishlist status"
+            data?.message || "Failed to check wishlist status"
           );
         }
 
@@ -122,10 +116,7 @@ const TurfCard = ({ turf }) => {
           setIsWishlisted(Boolean(data?.wishlisted));
         }
       } catch (error) {
-        console.error(
-          "Wishlist status error:",
-          error
-        );
+        console.error("Wishlist status error:", error);
 
         if (mounted) {
           setIsWishlisted(false);
@@ -177,26 +168,22 @@ const TurfCard = ({ turf }) => {
     try {
       setWishlistLoading(true);
 
-      const response = await fetch(
-        `${API_URL}/wishlist/toggle`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            userEmail,
-            turfId,
-          }),
-        }
-      );
+      const response = await fetch(`${API_URL}/wishlist/toggle`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          userEmail,
+          turfId,
+        }),
+      });
 
       const data = await response.json();
 
       if (!response.ok) {
         throw new Error(
-          data?.message ||
-            "Failed to update wishlist"
+          data?.message || "Failed to update wishlist"
         );
       }
 
@@ -229,10 +216,7 @@ const TurfCard = ({ turf }) => {
         color: "#111827",
       });
     } catch (error) {
-      console.error(
-        "Wishlist request failed:",
-        error
-      );
+      console.error("Wishlist request failed:", error);
 
       await Swal.fire({
         icon: "error",
@@ -254,123 +238,39 @@ const TurfCard = ({ turf }) => {
   };
 
   return (
-    <article
-      className="
-        group
-        overflow-hidden
-        rounded-2xl
-        border
-        border-gray-200
-        bg-white
-        transition-all
-        duration-300
-        hover:-translate-y-1
-        hover:border-gray-300
-        hover:shadow-xl
-        hover:shadow-gray-100
-      "
-    >
-      {/* Image */}
+    <article className="group overflow-hidden rounded-2xl border border-gray-200 bg-white transition-all duration-300 hover:-translate-y-1 hover:border-gray-300 hover:shadow-xl hover:shadow-gray-100">
       <div className="relative aspect-[4/3] overflow-hidden bg-gray-100">
         <img
           src={turfImage}
           alt={turfName}
           loading="lazy"
-          className="
-            h-full
-            w-full
-            object-cover
-            transition
-            duration-500
-            group-hover:scale-105
-          "
+          className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
           onError={handleImageError}
         />
 
-        {/* Top overlay */}
-        <div
-          className="
-            absolute
-            inset-x-0
-            top-0
-            z-20
-            flex
-            items-start
-            justify-between
-            p-4
-          "
-        >
-          <span
-            className="
-              rounded-full
-              bg-white/95
-              px-3
-              py-1.5
-              text-xs
-              font-semibold
-              text-gray-800
-              shadow-sm
-              backdrop-blur-sm
-            "
-          >
+        <div className="absolute inset-x-0 top-0 z-20 flex items-start justify-between p-4">
+          <span className="rounded-full bg-white/95 px-3 py-1.5 text-xs font-semibold text-gray-800 shadow-sm backdrop-blur-sm">
             {turfSport}
           </span>
 
           <button
             type="button"
             onClick={handleWishlist}
-            disabled={
-              wishlistLoading ||
-              wishlistChecking
-            }
+            disabled={wishlistLoading || wishlistChecking}
             aria-label={
               isWishlisted
                 ? `Remove ${turfName} from wishlist`
                 : `Add ${turfName} to wishlist`
             }
             aria-pressed={isWishlisted}
-            className={`
-              relative
-              z-30
-              flex
-              h-10
-              w-10
-              shrink-0
-              items-center
-              justify-center
-              rounded-full
-              bg-white/95
-              shadow-sm
-              backdrop-blur-sm
-              transition-all
-              duration-200
-              hover:scale-110
-              active:scale-90
-              disabled:cursor-not-allowed
-              disabled:opacity-70
-              ${
-                isWishlisted
-                  ? "text-red-500"
-                  : "text-gray-600 hover:text-red-500"
-              }
-              ${
-                wishlistAnimation
-                  ? "scale-125"
-                  : ""
-              }
-            `}
+            className={`relative z-30 flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/95 shadow-sm backdrop-blur-sm transition-all duration-200 hover:scale-110 active:scale-90 disabled:cursor-not-allowed disabled:opacity-70 ${
+              isWishlisted
+                ? "text-red-500"
+                : "text-gray-600 hover:text-red-500"
+            } ${wishlistAnimation ? "scale-125" : ""}`}
           >
             {wishlistAnimation && (
-              <span
-                className="
-                  pointer-events-none
-                  absolute
-                  inset-0
-                  animate-ping
-                  rounded-full
-                  bg-red-400/30
-                "
-              />
+              <span className="pointer-events-none absolute inset-0 animate-ping rounded-full bg-red-400/30" />
             )}
 
             {wishlistLoading || wishlistChecking ? (
@@ -383,38 +283,20 @@ const TurfCard = ({ turf }) => {
                 size={18}
                 strokeWidth={2}
                 className="relative z-10"
-                fill={
-                  isWishlisted
-                    ? "currentColor"
-                    : "none"
-                }
+                fill={isWishlisted ? "currentColor" : "none"}
               />
             )}
           </button>
         </div>
 
-        {/* Availability */}
         <div className="absolute bottom-4 left-4 z-10">
-          <span
-            className="
-              rounded-full
-              bg-gray-950/85
-              px-3
-              py-1.5
-              text-xs
-              font-medium
-              text-white
-              backdrop-blur-sm
-            "
-          >
+          <span className="rounded-full bg-gray-950/85 px-3 py-1.5 text-xs font-medium text-white backdrop-blur-sm">
             Available today
           </span>
         </div>
       </div>
 
-      {/* Content */}
       <div className="p-5">
-        {/* Name + rating */}
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <h3
@@ -425,10 +307,7 @@ const TurfCard = ({ turf }) => {
             </h3>
 
             <div className="mt-2 flex items-center gap-1.5 text-xs text-gray-500">
-              <MapPin
-                size={14}
-                className="shrink-0"
-              />
+              <MapPin size={14} className="shrink-0" />
 
               <span
                 className="truncate"
@@ -439,28 +318,11 @@ const TurfCard = ({ turf }) => {
             </div>
           </div>
 
-          {/* Rating */}
-          <div
-            className="
-              flex
-              shrink-0
-              items-center
-              gap-1
-              rounded-lg
-              bg-amber-50
-              px-2
-              py-1
-              text-xs
-              font-semibold
-              text-amber-700
-            "
-          >
+          <div className="flex shrink-0 items-center gap-1 rounded-lg bg-amber-50 px-2 py-1 text-xs font-semibold text-amber-700">
             <Star
               size={13}
               fill={
-                turfRating !== "New"
-                  ? "currentColor"
-                  : "none"
+                turfRating !== "New" ? "currentColor" : "none"
               }
             />
 
@@ -468,7 +330,6 @@ const TurfCard = ({ turf }) => {
           </div>
         </div>
 
-        {/* Turf info */}
         {(turfArea || turfSize || turfSurface) && (
           <div className="mt-4 flex flex-wrap gap-2">
             {turfArea && (
@@ -493,7 +354,6 @@ const TurfCard = ({ turf }) => {
 
         <div className="my-4 border-t border-gray-100" />
 
-        {/* Price + details */}
         <div className="flex items-end justify-between gap-4">
           <div>
             <p className="text-xs text-gray-400">
@@ -501,7 +361,7 @@ const TurfCard = ({ turf }) => {
             </p>
 
             <p className="mt-1 text-lg font-bold text-gray-900">
-              ৳{turfPrice.toLocaleString()}
+              ৳{turfPrice.toLocaleString("en-BD")}
 
               <span className="ml-1 text-xs font-normal text-gray-400">
                 / hour
@@ -513,51 +373,18 @@ const TurfCard = ({ turf }) => {
             <Link
               to={`/turfs/${encodeURIComponent(turfId)}`}
               aria-label={`View details for ${turfName}`}
-              className="
-                group/link
-                inline-flex
-                shrink-0
-                items-center
-                gap-1.5
-                rounded-lg
-                bg-gray-900
-                px-3.5
-                py-2.5
-                text-xs
-                font-semibold
-                text-white
-                transition-all
-                duration-200
-                hover:bg-green-600
-              "
+              className="group/link inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-gray-900 px-3.5 py-2.5 text-xs font-semibold text-white transition-all duration-200 hover:bg-green-600"
             >
               View details
 
               <ArrowUpRight
                 size={14}
-                className="
-                  transition-transform
-                  group-hover/link:-translate-y-0.5
-                  group-hover/link:translate-x-0.5
-                "
+                className="transition-transform group-hover/link:-translate-y-0.5 group-hover/link:translate-x-0.5"
               />
             </Link>
           ) : (
             <span
-              className="
-                inline-flex
-                shrink-0
-                items-center
-                gap-1.5
-                rounded-lg
-                bg-gray-200
-                px-3.5
-                py-2.5
-                text-xs
-                font-semibold
-                text-gray-400
-                cursor-not-allowed
-              "
+              className="inline-flex shrink-0 cursor-not-allowed items-center gap-1.5 rounded-lg bg-gray-200 px-3.5 py-2.5 text-xs font-semibold text-gray-400"
               title="Turf ID is missing"
             >
               Details unavailable

@@ -9,7 +9,7 @@ import {
 } from "lucide-react";
 
 import TurfCard from "../components/TurfCard";
-import { turfs } from "../data/turf";
+import { turfs as turfData } from "../data/turf";
 
 const locations = [
   "All locations",
@@ -22,12 +22,7 @@ const locations = [
   "Banani",
 ];
 
-const sports = [
-  "All sports",
-  "Football",
-  "Cricket",
-  "Badminton",
-];
+const sports = ["All sports", "Football", "Cricket", "Badminton"];
 
 const Turfs = () => {
   const [search, setSearch] = useState("");
@@ -37,39 +32,42 @@ const Turfs = () => {
   const [showFilters, setShowFilters] = useState(false);
 
   const filteredTurfs = useMemo(() => {
-    let result = turfs.filter((turf) => {
-      const query = search.trim().toLowerCase();
+    const query = search.trim().toLowerCase();
+
+    const result = turfData.filter((turf) => {
+      const name = String(turf.name || "").toLowerCase();
+      const turfLocation = String(turf.location || "").toLowerCase();
+      const area = String(turf.area || "").toLowerCase();
+      const turfSport = String(turf.sport || "").toLowerCase();
 
       const matchesSearch =
         !query ||
-        turf.name.toLowerCase().includes(query) ||
-        turf.location.toLowerCase().includes(query) ||
-        turf.area.toLowerCase().includes(query) ||
-        turf.sport.toLowerCase().includes(query);
+        name.includes(query) ||
+        turfLocation.includes(query) ||
+        area.includes(query) ||
+        turfSport.includes(query);
 
       const matchesLocation =
         location === "All locations" ||
-        turf.area.toLowerCase() === location.toLowerCase();
+        area === location.toLowerCase();
 
       const matchesSport =
         sport === "All sports" ||
-        turf.sport.toLowerCase() === sport.toLowerCase();
+        turfSport === sport.toLowerCase();
 
       return matchesSearch && matchesLocation && matchesSport;
     });
 
-    result = [...result];
-
     if (sort === "price-low") {
-      result.sort((a, b) => a.price - b.price);
+      result.sort((a, b) => Number(a.price || 0) - Number(b.price || 0));
     }
 
     if (sort === "price-high") {
-      result.sort((a, b) => b.price - a.price);
+      result.sort((a, b) => Number(b.price || 0) - Number(a.price || 0));
     }
 
     if (sort === "rating") {
-      result.sort((a, b) => b.rating - a.rating);
+      result.sort((a, b) => Number(b.rating || 0) - Number(a.rating || 0));
     }
 
     return result;

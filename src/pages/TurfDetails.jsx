@@ -26,7 +26,7 @@ const TurfDetails = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const turfId = String(id || "").trim();
+    const turfId = decodeURIComponent(String(id || "")).trim();
 
     if (!turfId) {
       setTurf(null);
@@ -84,8 +84,8 @@ const TurfDetails = () => {
           </h1>
 
           <p className="mt-3 text-sm leading-6 text-gray-500">
-            The turf you are looking for does not exist or is no longer
-            available.
+            The turf you are looking for does not exist or is no
+            longer available.
           </p>
 
           <Link
@@ -100,8 +100,7 @@ const TurfDetails = () => {
     );
   }
 
-  const turfId = String(turf.id || turf.slug || "").trim();
-
+  const turfId = String(turf.id);
   const turfName = turf.name || "Unnamed Turf";
 
   const turfImage =
@@ -121,9 +120,10 @@ const TurfDetails = () => {
       ? Number(turf.rating)
       : null;
 
-  const turfRating = Number.isFinite(ratingValue)
-    ? ratingValue.toFixed(1)
-    : "New";
+  const turfRating =
+    Number.isFinite(ratingValue)
+      ? ratingValue.toFixed(1)
+      : "New";
 
   const turfReviews = Number(turf.reviews) || 0;
   const turfPrice = Number(turf.price) || 0;
@@ -131,20 +131,16 @@ const TurfDetails = () => {
   const turfSize = turf.size || "Standard";
   const turfSurface = turf.surface || "Artificial Grass";
 
-  const openingTime = turf.openingTime || "08:00 AM";
+  const openingTime = turf.openingTime || "8:00 AM";
   const closingTime = turf.closingTime || "11:00 PM";
 
   const description =
     turf.description ||
     "A quality sports turf where you can enjoy your game with friends and teammates.";
 
-  const facilities =
-    Array.isArray(turf.amenities) && turf.amenities.length > 0
-      ? turf.amenities
-      : Array.isArray(turf.facilities) &&
-          turf.facilities.length > 0
-        ? turf.facilities
-        : [];
+  const facilities = Array.isArray(turf.amenities)
+    ? turf.amenities
+    : [];
 
   const bookingUrl = `/turfs/${encodeURIComponent(turfId)}/book`;
 

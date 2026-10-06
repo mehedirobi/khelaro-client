@@ -18,32 +18,6 @@ const API_URL = (
 const FALLBACK_IMAGE =
   "https://placehold.co/800x600?text=No+Turf+Image";
 
-const getTurfId = (turf) => {
-  if (!turf) return "";
-
-  if (typeof turf.id === "string" && turf.id.trim()) {
-    return turf.id.trim();
-  }
-
-  if (typeof turf._id === "string" && turf._id.trim()) {
-    return turf._id.trim();
-  }
-
-  if (
-    turf._id &&
-    typeof turf._id === "object" &&
-    typeof turf._id.$oid === "string"
-  ) {
-    return turf._id.$oid.trim();
-  }
-
-  if (typeof turf.turfId === "string" && turf.turfId.trim()) {
-    return turf.turfId.trim();
-  }
-
-  return "";
-};
-
 const TurfCard = ({ turf }) => {
   const { currentUser } = useAuth();
 
@@ -52,8 +26,7 @@ const TurfCard = ({ turf }) => {
   const [wishlistChecking, setWishlistChecking] = useState(false);
   const [wishlistAnimation, setWishlistAnimation] = useState(false);
 
-  const turfId = getTurfId(turf);
-
+  const turfId = String(turf?.id || "").trim();
   const turfName = turf?.name || "Unnamed Turf";
 
   const turfImage =
@@ -211,8 +184,6 @@ const TurfCard = ({ turf }) => {
         showConfirmButton: false,
         timer: 1600,
         timerProgressBar: true,
-        background: "#ffffff",
-        color: "#111827",
       });
     } catch (error) {
       console.error("Wishlist request failed:", error);
@@ -382,10 +353,7 @@ const TurfCard = ({ turf }) => {
               />
             </Link>
           ) : (
-            <span
-              className="inline-flex shrink-0 cursor-not-allowed items-center gap-1.5 rounded-lg bg-gray-200 px-3.5 py-2.5 text-xs font-semibold text-gray-400"
-              title="Turf ID is missing"
-            >
+            <span className="inline-flex shrink-0 cursor-not-allowed items-center gap-1.5 rounded-lg bg-gray-200 px-3.5 py-2.5 text-xs font-semibold text-gray-400">
               Details unavailable
             </span>
           )}

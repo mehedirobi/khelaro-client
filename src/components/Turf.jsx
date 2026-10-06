@@ -39,13 +39,25 @@ const Turfs = () => {
       const turfLocation = String(turf.location || "").toLowerCase();
       const area = String(turf.area || "").toLowerCase();
       const turfSport = String(turf.sport || "").toLowerCase();
+      const description = String(turf.description || "").toLowerCase();
+
+      const features = Array.isArray(turf.features)
+        ? turf.features.join(" ").toLowerCase()
+        : "";
+
+      const amenities = Array.isArray(turf.amenities)
+        ? turf.amenities.join(" ").toLowerCase()
+        : "";
 
       const matchesSearch =
         !query ||
         name.includes(query) ||
         turfLocation.includes(query) ||
         area.includes(query) ||
-        turfSport.includes(query);
+        turfSport.includes(query) ||
+        description.includes(query) ||
+        features.includes(query) ||
+        amenities.includes(query);
 
       const matchesLocation =
         location === "All locations" ||
@@ -58,19 +70,27 @@ const Turfs = () => {
       return matchesSearch && matchesLocation && matchesSport;
     });
 
+    const sortedTurfs = [...result];
+
     if (sort === "price-low") {
-      result.sort((a, b) => Number(a.price || 0) - Number(b.price || 0));
+      sortedTurfs.sort(
+        (a, b) => Number(a.price || 0) - Number(b.price || 0)
+      );
     }
 
     if (sort === "price-high") {
-      result.sort((a, b) => Number(b.price || 0) - Number(a.price || 0));
+      sortedTurfs.sort(
+        (a, b) => Number(b.price || 0) - Number(a.price || 0)
+      );
     }
 
     if (sort === "rating") {
-      result.sort((a, b) => Number(b.rating || 0) - Number(a.rating || 0));
+      sortedTurfs.sort(
+        (a, b) => Number(b.rating || 0) - Number(a.rating || 0)
+      );
     }
 
-    return result;
+    return sortedTurfs;
   }, [search, location, sport, sort]);
 
   const clearFilters = () => {
@@ -78,6 +98,16 @@ const Turfs = () => {
     setLocation("All locations");
     setSport("All sports");
     setSort("recommended");
+  };
+
+  const handleLocationChange = (value) => {
+    setLocation(value);
+    setShowFilters(false);
+  };
+
+  const handleSportChange = (value) => {
+    setSport(value);
+    setShowFilters(false);
   };
 
   const hasActiveFilters =
@@ -108,14 +138,16 @@ const Turfs = () => {
             <div className="relative flex-1">
               <Search
                 size={19}
+                aria-hidden="true"
                 className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400"
               />
 
               <input
-                type="text"
+                type="search"
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
                 placeholder="Search by turf name, location or sport..."
+                aria-label="Search turfs"
                 className="h-12 w-full rounded-xl border border-gray-200 bg-white pl-11 pr-4 text-sm outline-none transition placeholder:text-gray-400 focus:border-green-500 focus:ring-4 focus:ring-green-500/10"
               />
             </div>
@@ -123,6 +155,8 @@ const Turfs = () => {
             <button
               type="button"
               onClick={() => setShowFilters((previous) => !previous)}
+              aria-expanded={showFilters}
+              aria-controls="turf-filters"
               className="inline-flex h-12 items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-5 text-sm font-medium text-gray-700 transition hover:border-gray-300 lg:hidden"
             >
               <SlidersHorizontal size={18} />
@@ -134,7 +168,10 @@ const Turfs = () => {
 
       <section className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
         <div className="grid gap-8 lg:grid-cols-[240px_1fr]">
-          <aside className={`${showFilters ? "block" : "hidden"} lg:block`}>
+          <aside
+            id="turf-filters"
+            className={`${showFilters ? "block" : "hidden"} lg:block`}
+          >
             <div className="sticky top-24 rounded-2xl border border-gray-200 bg-white p-5">
               <div className="flex items-center justify-between">
                 <h2 className="font-semibold text-gray-900">Filters</h2>
@@ -160,17 +197,20 @@ const Turfs = () => {
                     <button
                       key={item}
                       type="button"
-                      onClick={() => setLocation(item)}
+                      onClick={() => handleLocationChange(item)}
                       className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm transition ${
                         location === item
                           ? "bg-green-50 font-medium text-green-700"
                           : "text-gray-500 hover:bg-gray-50 hover:text-gray-900"
                       }`}
                     >
-                      {item}
+                      <span>{item}</span>
 
                       {location === item && (
-                        <span className="h-1.5 w-1.5 rounded-full bg-green-600" />
+                        <span
+                          aria-hidden="true"
+                          className="h-1.5 w-1.5 rounded-full bg-green-600"
+                        />
                       )}
                     </button>
                   ))}
@@ -187,17 +227,20 @@ const Turfs = () => {
                     <button
                       key={item}
                       type="button"
-                      onClick={() => setSport(item)}
+                      onClick={() => handleSportChange(item)}
                       className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm transition ${
                         sport === item
                           ? "bg-green-50 font-medium text-green-700"
                           : "text-gray-500 hover:bg-gray-50 hover:text-gray-900"
                       }`}
                     >
-                      {item}
+                      <span>{item}</span>
 
                       {sport === item && (
-                        <span className="h-1.5 w-1.5 rounded-full bg-green-600" />
+                        <span
+                          aria-hidden="true"
+                          className="h-1.5 w-1.5 rounded-full bg-green-600"
+                        />
                       )}
                     </button>
                   ))}
@@ -228,7 +271,7 @@ const Turfs = () => {
                     id="sort"
                     value={sort}
                     onChange={(event) => setSort(event.target.value)}
-                    className="h-10 appearance-none rounded-lg border border-gray-200 bg-white pl-3 pr-9 text-sm text-gray-700 outline-none transition focus:border-green-500"
+                    className="h-10 appearance-none rounded-lg border border-gray-200 bg-white pl-3 pr-9 text-sm text-gray-700 outline-none transition focus:border-green-500 focus:ring-2 focus:ring-green-500/10"
                   >
                     <option value="recommended">Recommended</option>
                     <option value="rating">Highest rated</option>
@@ -238,13 +281,14 @@ const Turfs = () => {
 
                   <ChevronDown
                     size={15}
+                    aria-hidden="true"
                     className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-gray-400"
                   />
                 </div>
 
                 <Link
                   to="/turfs/map"
-                  className="hidden h-10 items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 text-sm font-medium text-gray-700 transition hover:border-gray-300 sm:inline-flex"
+                  className="hidden h-10 items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 text-sm font-medium text-gray-700 transition hover:border-gray-300 hover:text-gray-900 sm:inline-flex"
                 >
                   <Map size={16} />
                   Map
@@ -258,9 +302,9 @@ const Turfs = () => {
                   <button
                     type="button"
                     onClick={() => setSearch("")}
-                    className="inline-flex items-center gap-1.5 rounded-full bg-green-50 px-3 py-1.5 text-xs font-medium text-green-700"
+                    className="inline-flex items-center gap-1.5 rounded-full bg-green-50 px-3 py-1.5 text-xs font-medium text-green-700 transition hover:bg-green-100"
                   >
-                    Search: {search}
+                    <span>Search: {search}</span>
                     <X size={13} />
                   </button>
                 )}
@@ -269,9 +313,9 @@ const Turfs = () => {
                   <button
                     type="button"
                     onClick={() => setLocation("All locations")}
-                    className="inline-flex items-center gap-1.5 rounded-full bg-green-50 px-3 py-1.5 text-xs font-medium text-green-700"
+                    className="inline-flex items-center gap-1.5 rounded-full bg-green-50 px-3 py-1.5 text-xs font-medium text-green-700 transition hover:bg-green-100"
                   >
-                    {location}
+                    <span>{location}</span>
                     <X size={13} />
                   </button>
                 )}
@@ -280,9 +324,9 @@ const Turfs = () => {
                   <button
                     type="button"
                     onClick={() => setSport("All sports")}
-                    className="inline-flex items-center gap-1.5 rounded-full bg-green-50 px-3 py-1.5 text-xs font-medium text-green-700"
+                    className="inline-flex items-center gap-1.5 rounded-full bg-green-50 px-3 py-1.5 text-xs font-medium text-green-700 transition hover:bg-green-100"
                   >
-                    {sport}
+                    <span>{sport}</span>
                     <X size={13} />
                   </button>
                 )}
@@ -298,7 +342,11 @@ const Turfs = () => {
             ) : (
               <div className="rounded-2xl border border-gray-200 bg-white px-6 py-16 text-center">
                 <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-gray-100">
-                  <Search size={24} className="text-gray-400" />
+                  <Search
+                    size={24}
+                    aria-hidden="true"
+                    className="text-gray-400"
+                  />
                 </div>
 
                 <h3 className="mt-5 font-semibold text-gray-900">

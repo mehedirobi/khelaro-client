@@ -166,7 +166,7 @@ const TurfCard = ({ turf }) => {
       if (newStatus) {
         setWishlistAnimation(true);
 
-        setTimeout(() => {
+        window.setTimeout(() => {
           setWishlistAnimation(false);
         }, 600);
       }
@@ -261,7 +261,9 @@ const TurfCard = ({ turf }) => {
 
         <div className="absolute bottom-4 left-4 z-10">
           <span className="rounded-full bg-gray-950/85 px-3 py-1.5 text-xs font-medium text-white backdrop-blur-sm">
-            Available today
+            {turf?.available === false
+              ? "Currently unavailable"
+              : "Available today"}
           </span>
         </div>
       </div>
@@ -291,9 +293,7 @@ const TurfCard = ({ turf }) => {
           <div className="flex shrink-0 items-center gap-1 rounded-lg bg-amber-50 px-2 py-1 text-xs font-semibold text-amber-700">
             <Star
               size={13}
-              fill={
-                turfRating !== "New" ? "currentColor" : "none"
-              }
+              fill={turfRating !== "New" ? "currentColor" : "none"}
             />
 
             <span>{turfRating}</span>

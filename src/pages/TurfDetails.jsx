@@ -14,7 +14,7 @@ import {
   Loader2,
 } from "lucide-react";
 
-import { turfs } from "../data/turf";
+import { turfs } from "../data/turfs";
 
 const FALLBACK_IMAGE =
   "https://placehold.co/1200x800?text=No+Turf+Image";

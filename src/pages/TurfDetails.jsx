@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import {
   ArrowLeft,
@@ -21,28 +21,21 @@ const FALLBACK_IMAGE =
 
 const TurfDetails = () => {
   const { id } = useParams();
+  const [imageLoading, setImageLoading] = useState(true);
 
-  const [turf, setTurf] = useState(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
+  const turf = useMemo(() => {
     const turfId = decodeURIComponent(String(id || "")).trim();
 
     if (!turfId) {
-      setTurf(null);
-      setLoading(false);
-      return;
+      return null;
     }
 
-    const foundTurf = turfs.find((item) => {
+    return turfs.find((item) => {
       const itemId = String(item?.id || "").trim();
       const itemSlug = String(item?.slug || "").trim();
 
       return itemId === turfId || itemSlug === turfId;
     });
-
-    setTurf(foundTurf || null);
-    setLoading(false);
   }, [id]);
 
   const handleImageError = (event) => {
@@ -51,56 +44,15 @@ const TurfDetails = () => {
     }
   };
 
-  if (loading) {
-    return (
-      <main className="flex min-h-[70vh] items-center justify-center bg-gray-50 px-4">
-        <div className="flex flex-col items-center">
-          <Loader2
-            size={30}
-            className="animate-spin text-green-600"
-          />
-
-          <p className="mt-4 text-sm text-gray-500">
-            Loading turf details...
-          </p>
-        </div>
-      </main>
-    );
+  if (!id) {
+    return <TurfNotFound />;
   }
 
   if (!turf) {
-    return (
-      <main className="flex min-h-[70vh] items-center justify-center bg-gray-50 px-4">
-        <div className="max-w-md text-center">
-          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-red-50">
-            <AlertCircle
-              size={26}
-              className="text-red-500"
-            />
-          </div>
-
-          <h1 className="mt-5 text-2xl font-bold text-gray-900">
-            Turf not found
-          </h1>
-
-          <p className="mt-3 text-sm leading-6 text-gray-500">
-            The turf you are looking for does not exist or is no
-            longer available.
-          </p>
-
-          <Link
-            to="/turfs"
-            className="mt-6 inline-flex items-center gap-2 rounded-xl bg-green-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-green-700"
-          >
-            <ArrowLeft size={17} />
-            Back to Turfs
-          </Link>
-        </div>
-      </main>
-    );
+    return <TurfNotFound />;
   }
 
-  const turfId = String(turf.id);
+  const turfId = String(turf.id || "").trim();
   const turfName = turf.name || "Unnamed Turf";
 
   const turfImage =
@@ -120,10 +72,11 @@ const TurfDetails = () => {
       ? Number(turf.rating)
       : null;
 
-  const turfRating =
-    Number.isFinite(ratingValue)
-      ? ratingValue.toFixed(1)
-      : "New";
+  const hasRating = Number.isFinite(ratingValue);
+
+  const turfRating = hasRating
+    ? ratingValue.toFixed(1)
+    : "New";
 
   const turfReviews = Number(turf.reviews) || 0;
   const turfPrice = Number(turf.price) || 0;
@@ -139,13 +92,13 @@ const TurfDetails = () => {
     "A quality sports turf where you can enjoy your game with friends and teammates.";
 
   const facilities = Array.isArray(turf.amenities)
-    ? turf.amenities
+    ? turf.amenities.filter(Boolean)
     : [];
 
   const bookingUrl = `/turfs/${encodeURIComponent(turfId)}/book`;
 
   return (
-    <main className="bg-gray-50">
+    <main className="min-h-screen bg-gray-50">
       <section className="border-b border-gray-200 bg-white">
         <div className="mx-auto max-w-7xl px-4 py-4 sm:px-6 lg:px-8">
           <Link
@@ -161,12 +114,25 @@ const TurfDetails = () => {
       <section className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 lg:py-10">
         <div className="grid gap-8 lg:grid-cols-[1.5fr_1fr]">
           <div>
-            <div className="overflow-hidden rounded-2xl bg-gray-200">
+            <div className="relative overflow-hidden rounded-2xl bg-gray-200">
+              {imageLoading && (
+                <div className="absolute inset-0 z-10 flex items-center justify-center bg-gray-100">
+                  <Loader2
+                    size={28}
+                    className="animate-spin text-green-600"
+                  />
+                </div>
+              )}
+
               <img
                 src={turfImage}
                 alt={`${turfName} turf`}
-                onError={handleImageError}
                 loading="eager"
+                onLoad={() => setImageLoading(false)}
+                onError={(event) => {
+                  setImageLoading(false);
+                  handleImageError(event);
+                }}
                 className="h-[280px] w-full object-cover sm:h-[400px] lg:h-[470px]"
               />
             </div>
@@ -196,7 +162,7 @@ const TurfDetails = () => {
                   <Star
                     size={18}
                     className={
-                      ratingValue !== null
+                      hasRating
                         ? "fill-yellow-400 text-yellow-400"
                         : "text-gray-300"
                     }
@@ -225,50 +191,23 @@ const TurfDetails = () => {
               </div>
 
               <div className="mt-8 grid gap-4 sm:grid-cols-3">
-                <div className="rounded-xl bg-gray-50 p-4">
-                  <Users
-                    size={19}
-                    className="text-green-600"
-                  />
+                <InfoCard
+                  icon={<Users size={19} />}
+                  label="Turf Size"
+                  value={turfSize}
+                />
 
-                  <p className="mt-3 text-xs text-gray-400">
-                    Turf Size
-                  </p>
+                <InfoCard
+                  icon={<ShieldCheck size={19} />}
+                  label="Surface"
+                  value={turfSurface}
+                />
 
-                  <p className="mt-1 text-sm font-semibold text-gray-900">
-                    {turfSize}
-                  </p>
-                </div>
-
-                <div className="rounded-xl bg-gray-50 p-4">
-                  <ShieldCheck
-                    size={19}
-                    className="text-green-600"
-                  />
-
-                  <p className="mt-3 text-xs text-gray-400">
-                    Surface
-                  </p>
-
-                  <p className="mt-1 text-sm font-semibold text-gray-900">
-                    {turfSurface}
-                  </p>
-                </div>
-
-                <div className="rounded-xl bg-gray-50 p-4">
-                  <Clock3
-                    size={19}
-                    className="text-green-600"
-                  />
-
-                  <p className="mt-3 text-xs text-gray-400">
-                    Opening Hours
-                  </p>
-
-                  <p className="mt-1 text-sm font-semibold text-gray-900">
-                    {openingTime} - {closingTime}
-                  </p>
-                </div>
+                <InfoCard
+                  icon={<Clock3 size={19} />}
+                  label="Opening Hours"
+                  value={`${openingTime} - ${closingTime}`}
+                />
               </div>
 
               {facilities.length > 0 && (
@@ -320,7 +259,7 @@ const TurfDetails = () => {
                   <Star
                     size={15}
                     className={
-                      ratingValue !== null
+                      hasRating
                         ? "fill-yellow-400 text-yellow-400"
                         : "text-gray-300"
                     }
@@ -403,6 +342,54 @@ const TurfDetails = () => {
           </div>
         </div>
       </section>
+    </main>
+  );
+};
+
+const InfoCard = ({ icon, label, value }) => {
+  return (
+    <div className="rounded-xl bg-gray-50 p-4">
+      <div className="text-green-600">{icon}</div>
+
+      <p className="mt-3 text-xs text-gray-400">
+        {label}
+      </p>
+
+      <p className="mt-1 text-sm font-semibold text-gray-900">
+        {value}
+      </p>
+    </div>
+  );
+};
+
+const TurfNotFound = () => {
+  return (
+    <main className="flex min-h-[70vh] items-center justify-center bg-gray-50 px-4">
+      <div className="max-w-md text-center">
+        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-red-50">
+          <AlertCircle
+            size={26}
+            className="text-red-500"
+          />
+        </div>
+
+        <h1 className="mt-5 text-2xl font-bold text-gray-900">
+          Turf not found
+        </h1>
+
+        <p className="mt-3 text-sm leading-6 text-gray-500">
+          The turf you are looking for does not exist or is no
+          longer available.
+        </p>
+
+        <Link
+          to="/turfs"
+          className="mt-6 inline-flex items-center gap-2 rounded-xl bg-green-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-green-700"
+        >
+          <ArrowLeft size={17} />
+          Back to Turfs
+        </Link>
+      </div>
     </main>
   );
 };

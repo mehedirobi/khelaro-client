@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import {
   ArrowLeft,
@@ -12,90 +12,195 @@ import {
   ShieldCheck,
   AlertCircle,
   Loader2,
+  RefreshCw,
 } from "lucide-react";
 
-import { turfs } from "../data/turfs";
+const API_URL = (
+  import.meta.env.VITE_API_URL || "http://localhost:3000"
+).replace(/\/$/, "");
 
 const FALLBACK_IMAGE =
   "https://placehold.co/1200x800?text=No+Turf+Image";
 
 const TurfDetails = () => {
   const { id } = useParams();
+
+  const [turf, setTurf] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
   const [imageLoading, setImageLoading] = useState(true);
 
-  const turf = useMemo(() => {
-    const turfId = decodeURIComponent(String(id || "")).trim();
+  useEffect(() => {
+    const controller = new AbortController();
 
-    if (!turfId) {
-      return null;
-    }
+    const fetchTurf = async () => {
+      const turfId = decodeURIComponent(String(id || "")).trim();
 
-    return turfs.find((item) => {
-      const itemId = String(item?.id || "").trim();
-      const itemSlug = String(item?.slug || "").trim();
+      if (!turfId) {
+        setTurf(null);
+        setError("Invalid turf ID.");
+        setLoading(false);
+        return;
+      }
 
-      return itemId === turfId || itemSlug === turfId;
-    });
+      try {
+        setLoading(true);
+        setError("");
+        setTurf(null);
+        setImageLoading(true);
+
+        const response = await fetch(
+          `${API_URL}/turfs/${encodeURIComponent(turfId)}`,
+          {
+            method: "GET",
+            signal: controller.signal,
+          }
+        );
+
+        const data = await response.json().catch(() => ({}));
+
+        if (!response.ok) {
+          throw new Error(
+            data?.message ||
+              data?.error ||
+              "Failed to load turf details."
+          );
+        }
+
+        const turfData =
+          data?.turf && typeof data.turf === "object"
+            ? data.turf
+            : data;
+
+        if (!turfData || typeof turfData !== "object") {
+          throw new Error("Invalid turf data received from server.");
+        }
+
+        setTurf(turfData);
+      } catch (err) {
+        if (err.name === "AbortError") {
+          return;
+        }
+
+        console.error("Failed to load turf:", err);
+
+        setTurf(null);
+        setError(
+          err?.message ||
+            "Failed to load turf details. Please try again."
+        );
+      } finally {
+        if (!controller.signal.aborted) {
+          setLoading(false);
+        }
+      }
+    };
+
+    fetchTurf();
+
+    return () => {
+      controller.abort();
+    };
   }, [id]);
 
   const handleImageError = (event) => {
+    setImageLoading(false);
+
     if (event.currentTarget.src !== FALLBACK_IMAGE) {
       event.currentTarget.src = FALLBACK_IMAGE;
     }
   };
 
-  if (!id) {
-    return <TurfNotFound />;
+  if (loading) {
+    return <TurfLoading />;
   }
 
-  if (!turf) {
-    return <TurfNotFound />;
+  if (error || !turf) {
+    return (
+      <TurfError
+        message={
+          error || "The requested turf could not be found."
+        }
+      />
+    );
   }
 
-  const turfId = String(turf.id || "").trim();
-  const turfName = turf.name || "Unnamed Turf";
+  // MongoDB _id is the primary turf ID.
+  const turfId = turf?._id ? String(turf._id).trim() : "";
+
+  const turfName = String(
+    turf?.name || "Unnamed Turf"
+  ).trim();
 
   const turfImage =
-    typeof turf.image === "string" && turf.image.trim()
+    typeof turf?.image === "string" && turf.image.trim()
       ? turf.image.trim()
       : FALLBACK_IMAGE;
 
-  const turfLocation =
-    turf.location || turf.area || "Dhaka, Bangladesh";
+  const turfLocation = String(
+    turf?.location || turf?.area || "Dhaka, Bangladesh"
+  ).trim();
 
-  const turfSport = turf.sport || "Sports Turf";
+  const turfSport = String(
+    turf?.sport || "Sports Turf"
+  ).trim();
 
-  const ratingValue =
-    turf.rating !== undefined &&
-    turf.rating !== null &&
-    turf.rating !== ""
-      ? Number(turf.rating)
-      : null;
+  const ratingValue = Number(turf?.rating);
 
-  const hasRating = Number.isFinite(ratingValue);
+  const hasRating =
+    turf?.rating !== undefined &&
+    turf?.rating !== null &&
+    turf?.rating !== "" &&
+    Number.isFinite(ratingValue);
 
   const turfRating = hasRating
     ? ratingValue.toFixed(1)
     : "New";
 
-  const turfReviews = Number(turf.reviews) || 0;
-  const turfPrice = Number(turf.price) || 0;
+  const turfReviews = Number(turf?.reviews);
 
-  const turfSize = turf.size || "Standard";
-  const turfSurface = turf.surface || "Artificial Grass";
+  const safeReviews =
+    Number.isFinite(turfReviews) && turfReviews >= 0
+      ? turfReviews
+      : 0;
 
-  const openingTime = turf.openingTime || "8:00 AM";
-  const closingTime = turf.closingTime || "11:00 PM";
+  const turfPrice = Number(turf?.price);
 
-  const description =
-    turf.description ||
-    "A quality sports turf where you can enjoy your game with friends and teammates.";
+  const safePrice =
+    Number.isFinite(turfPrice) && turfPrice >= 0
+      ? turfPrice
+      : 0;
 
-  const facilities = Array.isArray(turf.amenities)
+  const turfSize = String(
+    turf?.size || "Standard"
+  ).trim();
+
+  const turfSurface = String(
+    turf?.surface || "Artificial Grass"
+  ).trim();
+
+  const openingTime = String(
+    turf?.openingTime || "8:00 AM"
+  ).trim();
+
+  const closingTime = String(
+    turf?.closingTime || "11:00 PM"
+  ).trim();
+
+  const description = String(
+    turf?.description ||
+      "A quality sports turf where you can enjoy your game with friends and teammates."
+  ).trim();
+
+  const facilities = Array.isArray(turf?.amenities)
     ? turf.amenities.filter(Boolean)
-    : [];
+    : Array.isArray(turf?.features)
+      ? turf.features.filter(Boolean)
+      : [];
 
-  const bookingUrl = `/turfs/${encodeURIComponent(turfId)}/book`;
+  const bookingUrl = turfId
+    ? `/turfs/${encodeURIComponent(turfId)}/book`
+    : "/turfs";
 
   return (
     <main className="min-h-screen bg-gray-50">
@@ -120,6 +225,7 @@ const TurfDetails = () => {
                   <Loader2
                     size={28}
                     className="animate-spin text-green-600"
+                    aria-hidden="true"
                   />
                 </div>
               )}
@@ -129,10 +235,7 @@ const TurfDetails = () => {
                 alt={`${turfName} turf`}
                 loading="eager"
                 onLoad={() => setImageLoading(false)}
-                onError={(event) => {
-                  setImageLoading(false);
-                  handleImageError(event);
-                }}
+                onError={handleImageError}
                 className="h-[280px] w-full object-cover sm:h-[400px] lg:h-[470px]"
               />
             </div>
@@ -152,6 +255,7 @@ const TurfDetails = () => {
                     <MapPin
                       size={17}
                       className="mt-0.5 shrink-0 text-green-600"
+                      aria-hidden="true"
                     />
 
                     <span>{turfLocation}</span>
@@ -161,6 +265,7 @@ const TurfDetails = () => {
                 <div className="flex shrink-0 items-center gap-2">
                   <Star
                     size={18}
+                    aria-hidden="true"
                     className={
                       hasRating
                         ? "fill-yellow-400 text-yellow-400"
@@ -173,7 +278,7 @@ const TurfDetails = () => {
                   </span>
 
                   <span className="text-sm text-gray-400">
-                    ({turfReviews} reviews)
+                    ({safeReviews} reviews)
                   </span>
                 </div>
               </div>
@@ -219,12 +324,13 @@ const TurfDetails = () => {
                   <div className="mt-4 grid gap-3 sm:grid-cols-2">
                     {facilities.map((facility, index) => (
                       <div
-                        key={`${facility}-${index}`}
+                        key={`${String(facility)}-${index}`}
                         className="flex items-center gap-2 text-sm text-gray-600"
                       >
                         <CheckCircle2
                           size={17}
                           className="shrink-0 text-green-600"
+                          aria-hidden="true"
                         />
 
                         <span>{facility}</span>
@@ -246,7 +352,7 @@ const TurfDetails = () => {
 
                   <div className="mt-1 flex items-baseline gap-1">
                     <span className="text-3xl font-bold text-gray-900">
-                      ৳{turfPrice.toLocaleString("en-BD")}
+                      ৳{safePrice.toLocaleString("en-BD")}
                     </span>
 
                     <span className="text-sm text-gray-400">
@@ -258,6 +364,7 @@ const TurfDetails = () => {
                 <div className="flex items-center gap-1 rounded-lg bg-green-50 px-2.5 py-1.5">
                   <Star
                     size={15}
+                    aria-hidden="true"
                     className={
                       hasRating
                         ? "fill-yellow-400 text-yellow-400"
@@ -276,7 +383,10 @@ const TurfDetails = () => {
               <div className="space-y-4">
                 <div className="flex items-center gap-3">
                   <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-green-50 text-green-600">
-                    <CalendarDays size={19} />
+                    <CalendarDays
+                      size={19}
+                      aria-hidden="true"
+                    />
                   </div>
 
                   <div className="min-w-0">
@@ -284,18 +394,27 @@ const TurfDetails = () => {
                       Availability
                     </p>
 
-                    <Link
-                      to={bookingUrl}
-                      className="text-sm font-medium text-gray-900 transition hover:text-green-600"
-                    >
-                      Check available slots
-                    </Link>
+                    {turfId ? (
+                      <Link
+                        to={bookingUrl}
+                        className="text-sm font-medium text-gray-900 transition hover:text-green-600"
+                      >
+                        Check available slots
+                      </Link>
+                    ) : (
+                      <p className="text-sm font-medium text-gray-400">
+                        Availability unavailable
+                      </p>
+                    )}
                   </div>
                 </div>
 
                 <div className="flex items-center gap-3">
                   <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-green-50 text-green-600">
-                    <Clock3 size={19} />
+                    <Clock3
+                      size={19}
+                      aria-hidden="true"
+                    />
                   </div>
 
                   <div>
@@ -311,7 +430,10 @@ const TurfDetails = () => {
 
                 <div className="flex items-center gap-3">
                   <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-green-50 text-green-600">
-                    <MapPin size={19} />
+                    <MapPin
+                      size={19}
+                      aria-hidden="true"
+                    />
                   </div>
 
                   <div className="min-w-0">
@@ -326,17 +448,27 @@ const TurfDetails = () => {
                 </div>
               </div>
 
-              <Link
-                to={bookingUrl}
-                className="mt-7 flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-green-600 text-sm font-semibold text-white transition hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2"
-              >
-                Check Availability
-                <ArrowRight size={17} />
-              </Link>
+              {turfId ? (
+                <Link
+                  to={bookingUrl}
+                  className="mt-7 flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-green-600 text-sm font-semibold text-white transition hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2"
+                >
+                  Check Availability
+                  <ArrowRight size={17} />
+                </Link>
+              ) : (
+                <button
+                  type="button"
+                  disabled
+                  className="mt-7 flex h-12 w-full cursor-not-allowed items-center justify-center rounded-xl bg-gray-200 text-sm font-semibold text-gray-400"
+                >
+                  Booking unavailable
+                </button>
+              )}
 
               <p className="mt-4 text-center text-xs leading-5 text-gray-400">
-                Select your preferred date and time to see available
-                slots.
+                Select your preferred date and time to see
+                available slots.
               </p>
             </div>
           </div>
@@ -362,7 +494,29 @@ const InfoCard = ({ icon, label, value }) => {
   );
 };
 
-const TurfNotFound = () => {
+const TurfLoading = () => {
+  return (
+    <main className="flex min-h-[70vh] items-center justify-center bg-gray-50 px-4">
+      <div className="text-center">
+        <Loader2
+          size={32}
+          className="mx-auto animate-spin text-green-600"
+          aria-hidden="true"
+        />
+
+        <h1 className="mt-5 text-xl font-semibold text-gray-900">
+          Loading turf...
+        </h1>
+
+        <p className="mt-2 text-sm text-gray-500">
+          Please wait while we load the turf details.
+        </p>
+      </div>
+    </main>
+  );
+};
+
+const TurfError = ({ message }) => {
   return (
     <main className="flex min-h-[70vh] items-center justify-center bg-gray-50 px-4">
       <div className="max-w-md text-center">
@@ -370,25 +524,36 @@ const TurfNotFound = () => {
           <AlertCircle
             size={26}
             className="text-red-500"
+            aria-hidden="true"
           />
         </div>
 
         <h1 className="mt-5 text-2xl font-bold text-gray-900">
-          Turf not found
+          Unable to load turf
         </h1>
 
         <p className="mt-3 text-sm leading-6 text-gray-500">
-          The turf you are looking for does not exist or is no
-          longer available.
+          {message}
         </p>
 
-        <Link
-          to="/turfs"
-          className="mt-6 inline-flex items-center gap-2 rounded-xl bg-green-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-green-700"
-        >
-          <ArrowLeft size={17} />
-          Back to Turfs
-        </Link>
+        <div className="mt-6 flex flex-col justify-center gap-3 sm:flex-row">
+          <button
+            type="button"
+            onClick={() => window.location.reload()}
+            className="inline-flex items-center justify-center gap-2 rounded-xl bg-gray-900 px-5 py-3 text-sm font-semibold text-white transition hover:bg-gray-800"
+          >
+            <RefreshCw size={16} />
+            Try again
+          </button>
+
+          <Link
+            to="/turfs"
+            className="inline-flex items-center justify-center gap-2 rounded-xl bg-green-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-green-700"
+          >
+            <ArrowLeft size={17} />
+            Back to Turfs
+          </Link>
+        </div>
       </div>
     </main>
   );

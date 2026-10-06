@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   Search,
@@ -6,10 +6,13 @@ import {
   X,
   ChevronDown,
   Map,
+  LoaderCircle,
+  RefreshCw,
 } from "lucide-react";
 
 import TurfCard from "../components/TurfCard";
-import { turfs as turfData } from "../data/turfs";
+
+const API_URL = "http://localhost:3000";
 
 const locations = [
   "All locations",
@@ -24,17 +27,73 @@ const locations = [
 
 const sports = ["All sports", "Football", "Cricket", "Badminton"];
 
-const Turfs = () => {
+const Turf = () => {
+  const [turfs, setTurfs] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
   const [search, setSearch] = useState("");
   const [location, setLocation] = useState("All locations");
   const [sport, setSport] = useState("All sports");
   const [sort, setSort] = useState("recommended");
   const [showFilters, setShowFilters] = useState(false);
 
+  const fetchTurfs = async () => {
+    const controller = new AbortController();
+
+    try {
+      setLoading(true);
+      setError("");
+
+      const response = await fetch(`${API_URL}/turfs`, {
+        method: "GET",
+        signal: controller.signal,
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to load turfs (${response.status})`);
+      }
+
+      const data = await response.json();
+
+      const turfList = Array.isArray(data)
+        ? data
+        : Array.isArray(data.turfs)
+          ? data.turfs
+          : [];
+
+      setTurfs(turfList);
+    } catch (err) {
+      if (err.name === "AbortError") return;
+
+      console.error("Failed to load turfs:", err);
+      setTurfs([]);
+      setError("Failed to load turfs. Please try again.");
+    } finally {
+      if (!controller.signal.aborted) {
+        setLoading(false);
+      }
+    }
+
+    return () => controller.abort();
+  };
+
+  useEffect(() => {
+    let cleanup;
+
+    fetchTurfs().then((cleanupFunction) => {
+      cleanup = cleanupFunction;
+    });
+
+    return () => {
+      if (cleanup) cleanup();
+    };
+  }, []);
+
   const filteredTurfs = useMemo(() => {
     const query = search.trim().toLowerCase();
 
-    const result = turfData.filter((turf) => {
+    const result = turfs.filter((turf) => {
       const name = String(turf.name || "").toLowerCase();
       const turfLocation = String(turf.location || "").toLowerCase();
       const area = String(turf.area || "").toLowerCase();
@@ -43,11 +102,11 @@ const Turfs = () => {
 
       const features = Array.isArray(turf.features)
         ? turf.features.join(" ").toLowerCase()
-        : "";
+        : String(turf.features || "").toLowerCase();
 
       const amenities = Array.isArray(turf.amenities)
         ? turf.amenities.join(" ").toLowerCase()
-        : "";
+        : String(turf.amenities || "").toLowerCase();
 
       const matchesSearch =
         !query ||
@@ -59,9 +118,12 @@ const Turfs = () => {
         features.includes(query) ||
         amenities.includes(query);
 
+      const normalizedSelectedLocation = location.toLowerCase();
+
       const matchesLocation =
         location === "All locations" ||
-        area === location.toLowerCase();
+        area === normalizedSelectedLocation ||
+        turfLocation.includes(normalizedSelectedLocation);
 
       const matchesSport =
         sport === "All sports" ||
@@ -91,7 +153,7 @@ const Turfs = () => {
     }
 
     return sortedTurfs;
-  }, [search, location, sport, sort]);
+  }, [turfs, search, location, sport, sort]);
 
   const clearFilters = () => {
     setSearch("");
@@ -253,7 +315,7 @@ const Turfs = () => {
             <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <p className="text-sm text-gray-500">
                 <span className="font-semibold text-gray-900">
-                  {filteredTurfs.length}
+                  {loading ? 0 : filteredTurfs.length}
                 </span>{" "}
                 {filteredTurfs.length === 1 ? "turf" : "turfs"} found
               </p>
@@ -333,10 +395,56 @@ const Turfs = () => {
               </div>
             )}
 
-            {filteredTurfs.length > 0 ? (
+            {loading ? (
+              <div className="rounded-2xl border border-gray-200 bg-white px-6 py-20 text-center">
+                <LoaderCircle
+                  size={28}
+                  className="mx-auto animate-spin text-green-600"
+                  aria-hidden="true"
+                />
+
+                <h3 className="mt-5 font-semibold text-gray-900">
+                  Loading turfs...
+                </h3>
+
+                <p className="mt-2 text-sm text-gray-500">
+                  Please wait while we load available turfs.
+                </p>
+              </div>
+            ) : error ? (
+              <div className="rounded-2xl border border-red-100 bg-white px-6 py-16 text-center">
+                <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-red-50">
+                  <RefreshCw
+                    size={24}
+                    aria-hidden="true"
+                    className="text-red-500"
+                  />
+                </div>
+
+                <h3 className="mt-5 font-semibold text-gray-900">
+                  Unable to load turfs
+                </h3>
+
+                <p className="mx-auto mt-2 max-w-sm text-sm leading-6 text-gray-500">
+                  {error}
+                </p>
+
+                <button
+                  type="button"
+                  onClick={fetchTurfs}
+                  className="mt-5 inline-flex items-center gap-2 rounded-lg bg-gray-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-green-600"
+                >
+                  <RefreshCw size={16} />
+                  Try again
+                </button>
+              </div>
+            ) : filteredTurfs.length > 0 ? (
               <div className="grid gap-5 md:grid-cols-2">
                 {filteredTurfs.map((turf) => (
-                  <TurfCard key={turf.id} turf={turf} />
+                  <TurfCard
+                    key={turf._id}
+                    turf={turf}
+                  />
                 ))}
               </div>
             ) : (
@@ -376,4 +484,4 @@ const Turfs = () => {
   );
 };
 
-export default Turfs;
+export default Turf;

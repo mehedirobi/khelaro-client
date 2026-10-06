@@ -26,8 +26,10 @@ const TurfCard = ({ turf }) => {
   const [wishlistChecking, setWishlistChecking] = useState(false);
   const [wishlistAnimation, setWishlistAnimation] = useState(false);
 
-  const turfId = String(turf?.id || "").trim();
-  const turfName = turf?.name || "Unnamed Turf";
+  // MongoDB _id is the primary turf ID
+  const turfId = turf?._id ? String(turf._id).trim() : "";
+
+  const turfName = String(turf?.name || "Unnamed Turf").trim();
 
   const turfImage =
     typeof turf?.image === "string" && turf.image.trim()
@@ -35,35 +37,41 @@ const TurfCard = ({ turf }) => {
       : FALLBACK_IMAGE;
 
   const turfLocation =
-    turf?.location || turf?.area || "Dhaka, Bangladesh";
+    String(turf?.location || turf?.area || "Dhaka, Bangladesh").trim();
 
-  const turfArea = turf?.area || "";
-  const turfSport = turf?.sport || "Sports Turf";
-  const turfSize = turf?.size || "";
-  const turfSurface = turf?.surface || "";
+  const turfArea = String(turf?.area || "").trim();
 
-  const turfRating =
+  const turfSport = String(turf?.sport || "Sports Turf").trim();
+
+  const turfSize = String(turf?.size || "").trim();
+
+  const turfSurface = String(turf?.surface || "").trim();
+
+  const ratingValue = Number(turf?.rating);
+
+  const hasRating =
     turf?.rating !== undefined &&
     turf?.rating !== null &&
-    turf?.rating !== ""
-      ? turf.rating
-      : "New";
+    turf?.rating !== "" &&
+    !Number.isNaN(ratingValue);
 
-  const turfPrice = Number(turf?.price) || 0;
+  const turfRating = hasRating ? ratingValue : null;
+
+  const turfPrice = Number(turf?.price);
+
+  const safePrice = Number.isFinite(turfPrice) ? turfPrice : 0;
 
   const userEmail = currentUser?.email
     ? String(currentUser.email).trim().toLowerCase()
     : "";
 
   useEffect(() => {
-    let mounted = true;
+    const controller = new AbortController();
 
     const checkWishlistStatus = async () => {
       if (!userEmail || !turfId) {
-        if (mounted) {
-          setIsWishlisted(false);
-          setWishlistChecking(false);
-        }
+        setIsWishlisted(false);
+        setWishlistChecking(false);
         return;
       }
 
@@ -73,10 +81,14 @@ const TurfCard = ({ turf }) => {
         const response = await fetch(
           `${API_URL}/wishlist/${encodeURIComponent(
             userEmail
-          )}/${encodeURIComponent(turfId)}`
+          )}/${encodeURIComponent(turfId)}`,
+          {
+            method: "GET",
+            signal: controller.signal,
+          }
         );
 
-        const data = await response.json();
+        const data = await response.json().catch(() => ({}));
 
         if (!response.ok) {
           throw new Error(
@@ -84,17 +96,14 @@ const TurfCard = ({ turf }) => {
           );
         }
 
-        if (mounted) {
-          setIsWishlisted(Boolean(data?.wishlisted));
-        }
+        setIsWishlisted(Boolean(data?.wishlisted));
       } catch (error) {
-        console.error("Wishlist status error:", error);
+        if (error.name === "AbortError") return;
 
-        if (mounted) {
-          setIsWishlisted(false);
-        }
+        console.error("Wishlist status error:", error);
+        setIsWishlisted(false);
       } finally {
-        if (mounted) {
+        if (!controller.signal.aborted) {
           setWishlistChecking(false);
         }
       }
@@ -103,7 +112,7 @@ const TurfCard = ({ turf }) => {
     checkWishlistStatus();
 
     return () => {
-      mounted = false;
+      controller.abort();
     };
   }, [userEmail, turfId]);
 
@@ -126,7 +135,7 @@ const TurfCard = ({ turf }) => {
       await Swal.fire({
         icon: "error",
         title: "Invalid turf",
-        text: "This turf does not have a valid ID.",
+        text: "This turf does not have a valid MongoDB ID.",
         confirmButtonColor: "#16a34a",
       });
 
@@ -151,11 +160,11 @@ const TurfCard = ({ turf }) => {
         }),
       });
 
-      const data = await response.json();
+      const data = await response.json().catch(() => ({}));
 
       if (!response.ok) {
         throw new Error(
-          data?.message || "Failed to update wishlist"
+          data?.message || `Wishlist request failed (${response.status})`
         );
       }
 
@@ -206,6 +215,8 @@ const TurfCard = ({ turf }) => {
       event.currentTarget.src = FALLBACK_IMAGE;
     }
   };
+
+  const isAvailable = turf?.available !== false;
 
   return (
     <article className="group overflow-hidden rounded-2xl border border-gray-200 bg-white transition-all duration-300 hover:-translate-y-1 hover:border-gray-300 hover:shadow-xl hover:shadow-gray-100">
@@ -261,9 +272,9 @@ const TurfCard = ({ turf }) => {
 
         <div className="absolute bottom-4 left-4 z-10">
           <span className="rounded-full bg-gray-950/85 px-3 py-1.5 text-xs font-medium text-white backdrop-blur-sm">
-            {turf?.available === false
-              ? "Currently unavailable"
-              : "Available today"}
+            {isAvailable
+              ? "Available today"
+              : "Currently unavailable"}
           </span>
         </div>
       </div>
@@ -293,10 +304,10 @@ const TurfCard = ({ turf }) => {
           <div className="flex shrink-0 items-center gap-1 rounded-lg bg-amber-50 px-2 py-1 text-xs font-semibold text-amber-700">
             <Star
               size={13}
-              fill={turfRating !== "New" ? "currentColor" : "none"}
+              fill={hasRating ? "currentColor" : "none"}
             />
 
-            <span>{turfRating}</span>
+            <span>{hasRating ? turfRating : "New"}</span>
           </div>
         </div>
 
@@ -331,7 +342,7 @@ const TurfCard = ({ turf }) => {
             </p>
 
             <p className="mt-1 text-lg font-bold text-gray-900">
-              ৳{turfPrice.toLocaleString("en-BD")}
+              ৳{safePrice.toLocaleString("en-BD")}
 
               <span className="ml-1 text-xs font-normal text-gray-400">
                 / hour

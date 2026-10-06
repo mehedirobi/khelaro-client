@@ -91,7 +91,6 @@ const TurfCard = ({ turf }) => {
           setIsWishlisted(false);
           setWishlistChecking(false);
         }
-
         return;
       }
 

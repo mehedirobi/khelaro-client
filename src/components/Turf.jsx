@@ -9,7 +9,7 @@ import {
 } from "lucide-react";
 
 import TurfCard from "../components/TurfCard";
-import { turfs as turfData } from "../data/turf";
+import { turfs as turfData } from "../data/turfs";
 
 const locations = [
   "All locations",

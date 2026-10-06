@@ -26,28 +26,23 @@ const TurfDetails = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const findTurf = () => {
-      setLoading(true);
+    const turfId = String(id || "").trim();
 
-      const turfId = String(id || "").trim();
-
-      if (!turfId) {
-        setTurf(null);
-        setLoading(false);
-        return;
-      }
-
-      const foundTurf = turfs.find(
-        (item) =>
-          String(item.id).trim() === turfId ||
-          String(item.slug).trim() === turfId
-      );
-
-      setTurf(foundTurf || null);
+    if (!turfId) {
+      setTurf(null);
       setLoading(false);
-    };
+      return;
+    }
 
-    findTurf();
+    const foundTurf = turfs.find((item) => {
+      const itemId = String(item?.id || "").trim();
+      const itemSlug = String(item?.slug || "").trim();
+
+      return itemId === turfId || itemSlug === turfId;
+    });
+
+    setTurf(foundTurf || null);
+    setLoading(false);
   }, [id]);
 
   const handleImageError = (event) => {
@@ -105,12 +100,13 @@ const TurfDetails = () => {
     );
   }
 
-  const turfId = turf.id;
+  const turfId = String(turf.id || turf.slug || "").trim();
+
   const turfName = turf.name || "Unnamed Turf";
 
   const turfImage =
     typeof turf.image === "string" && turf.image.trim()
-      ? turf.image
+      ? turf.image.trim()
       : FALLBACK_IMAGE;
 
   const turfLocation =
@@ -125,10 +121,9 @@ const TurfDetails = () => {
       ? Number(turf.rating)
       : null;
 
-  const turfRating =
-    Number.isFinite(ratingValue)
-      ? ratingValue.toFixed(1)
-      : "New";
+  const turfRating = Number.isFinite(ratingValue)
+    ? ratingValue.toFixed(1)
+    : "New";
 
   const turfReviews = Number(turf.reviews) || 0;
   const turfPrice = Number(turf.price) || 0;
@@ -146,7 +141,10 @@ const TurfDetails = () => {
   const facilities =
     Array.isArray(turf.amenities) && turf.amenities.length > 0
       ? turf.amenities
-      : [];
+      : Array.isArray(turf.facilities) &&
+          turf.facilities.length > 0
+        ? turf.facilities
+        : [];
 
   const bookingUrl = `/turfs/${encodeURIComponent(turfId)}/book`;
 

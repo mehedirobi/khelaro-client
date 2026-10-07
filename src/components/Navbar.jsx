@@ -9,6 +9,7 @@ import {
   LogOut,
   ChevronDown,
   CircleUserRound,
+  Search,
 } from "lucide-react";
 import useAuth from "../hooks/useAuth";
 
@@ -20,6 +21,7 @@ const Navbar = () => {
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [userData, setUserData] = useState(null);
   const [profileLoading, setProfileLoading] = useState(false);
+  const [isScrolled, setIsScrolled] = useState(false);
 
   const navigate = useNavigate();
   const { currentUser, loading, logout } = useAuth();
@@ -82,7 +84,12 @@ const Navbar = () => {
       };
 
       setUserData(finalUser);
-      localStorage.setItem("khelaro-user", JSON.stringify(finalUser));
+
+      localStorage.setItem(
+        "khelaro-user",
+        JSON.stringify(finalUser)
+      );
+
       localStorage.setItem("khelaro-uid", currentUser.uid);
     } catch (error) {
       console.error("MongoDB user fetch error:", error);
@@ -128,6 +135,18 @@ const Navbar = () => {
     };
   }, [currentUser]);
 
+  useEffect(() => {
+    const handleScroll = () => {
+      setIsScrolled(window.scrollY > 8);
+    };
+
+    window.addEventListener("scroll", handleScroll);
+
+    return () => {
+      window.removeEventListener("scroll", handleScroll);
+    };
+  }, []);
+
   const userRole = String(userData?.role || "user")
     .trim()
     .toLowerCase();
@@ -151,10 +170,24 @@ const Navbar = () => {
   const wishlistPath = "/dashboard/wishlist";
 
   const navLinks = [
-    { name: "Home", path: "/" },
-    { name: "Find Turf", path: "/turfs" },
-    { name: "About", path: "/about" },
-    { name: "Contact", path: "/contact" },
+    {
+      name: "Home",
+      path: "/",
+      end: true,
+    },
+    {
+      name: "Find Turf",
+      path: "/turfs",
+      icon: Search,
+    },
+    {
+      name: "About",
+      path: "/about",
+    },
+    {
+      name: "Contact",
+      path: "/contact",
+    },
   ];
 
   const closeMenu = () => {
@@ -210,152 +243,248 @@ const Navbar = () => {
 
   const isUserLoading = loading || profileLoading;
 
+  const getRoleColor = () => {
+    if (isAdmin) return "text-red-600 bg-red-50";
+    if (isOwner) return "text-blue-600 bg-blue-50";
+    return "text-green-600 bg-green-50";
+  };
+
   return (
-    <header className="sticky top-0 z-50 border-b border-gray-100 bg-white/95 backdrop-blur">
-      <div className="mx-auto flex h-[72px] max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
+    <header
+      className={`sticky top-0 z-50 border-b transition-all duration-300 ${
+        isScrolled
+          ? "border-gray-200/80 bg-white/90 shadow-sm backdrop-blur-xl"
+          : "border-gray-100 bg-white"
+      }`}
+    >
+      <div className="mx-auto flex h-[74px] max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
+        {/* Logo */}
         <Link
           to="/"
           onClick={closeMenu}
-          className="flex items-center gap-2"
+          className="group flex shrink-0 items-center gap-2.5"
         >
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-green-600 text-lg font-bold text-white">
-            K
+          <div className="relative flex h-10 w-10 items-center justify-center overflow-hidden rounded-xl bg-gradient-to-br from-green-500 to-green-700 text-lg font-extrabold text-white shadow-sm transition-all duration-300 group-hover:scale-105 group-hover:shadow-md">
+            <span className="relative z-10">K</span>
+
+            <div className="absolute inset-0 -translate-x-full bg-white/20 transition-transform duration-500 group-hover:translate-x-full" />
           </div>
 
-          <span className="text-xl font-bold tracking-tight text-gray-900">
-            Khelaro
-          </span>
+          <div className="leading-none">
+            <span className="block text-[20px] font-extrabold tracking-tight text-gray-950">
+              Khelaro
+            </span>
+
+            <span className="mt-0.5 hidden text-[9px] font-medium uppercase tracking-[0.18em] text-gray-400 sm:block">
+              Play. Book. Enjoy.
+            </span>
+          </div>
         </Link>
 
-        <nav className="hidden items-center gap-8 lg:flex">
-          {navLinks.map((link) => (
-            <NavLink
-              key={link.path}
-              to={link.path}
-              className={({ isActive }) =>
-                `text-sm font-medium transition-colors ${
-                  isActive
-                    ? "text-green-600"
-                    : "text-gray-600 hover:text-green-600"
-                }`
-              }
-            >
-              {link.name}
-            </NavLink>
-          ))}
+        {/* Desktop Navigation */}
+        <nav className="hidden items-center gap-1 lg:flex">
+          {navLinks.map((link) => {
+            const Icon = link.icon;
+
+            return (
+              <NavLink
+                key={link.path}
+                to={link.path}
+                end={link.end}
+                className={({ isActive }) =>
+                  `group relative flex items-center gap-2 rounded-xl px-4 py-2.5 text-[13px] font-semibold transition-all duration-300 ${
+                    isActive
+                      ? "bg-green-50 text-green-700"
+                      : "text-gray-600 hover:bg-gray-50 hover:text-gray-950"
+                  }`
+                }
+              >
+                {({ isActive }) => (
+                  <>
+                    {Icon && (
+                      <Icon
+                        size={15}
+                        strokeWidth={2}
+                        className={`transition-transform duration-300 ${
+                          isActive
+                            ? "scale-105"
+                            : "group-hover:scale-105"
+                        }`}
+                      />
+                    )}
+
+                    <span>{link.name}</span>
+
+                    <span
+                      className={`absolute bottom-1 left-1/2 h-0.5 -translate-x-1/2 rounded-full bg-green-600 transition-all duration-300 ${
+                        isActive
+                          ? "w-5 opacity-100"
+                          : "w-0 opacity-0 group-hover:w-3 group-hover:opacity-60"
+                      }`}
+                    />
+                  </>
+                )}
+              </NavLink>
+            );
+          })}
         </nav>
 
+        {/* Desktop Right Section */}
         <div className="hidden items-center gap-2 lg:flex">
           {isUserLoading ? (
-            <div className="h-10 w-32 animate-pulse rounded-xl bg-gray-100" />
+            <div className="flex items-center gap-2">
+              <div className="h-10 w-10 animate-pulse rounded-xl bg-gray-100" />
+              <div className="h-10 w-28 animate-pulse rounded-xl bg-gray-100" />
+            </div>
           ) : currentUser ? (
             <>
+              {/* Wishlist */}
               {isCustomer && (
-                <Link
+                <NavLink
                   to={wishlistPath}
-                  className="flex h-10 w-10 items-center justify-center rounded-xl text-gray-600 transition hover:bg-red-50 hover:text-red-500"
                   aria-label="Wishlist"
+                  className={({ isActive }) =>
+                    `group relative flex h-10 w-10 items-center justify-center rounded-xl border transition-all duration-300 ${
+                      isActive
+                        ? "border-red-100 bg-red-50 text-red-500"
+                        : "border-transparent text-gray-500 hover:border-red-100 hover:bg-red-50 hover:text-red-500"
+                    }`
+                  }
                 >
-                  <Heart size={19} strokeWidth={1.8} />
-                </Link>
+                  {({ isActive }) => (
+                    <>
+                      <Heart
+                        size={18}
+                        strokeWidth={isActive ? 2.2 : 1.9}
+                        className="transition-transform duration-300 group-hover:scale-110"
+                      />
+
+                      {isActive && (
+                        <span className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-red-500 ring-2 ring-white" />
+                      )}
+                    </>
+                  )}
+                </NavLink>
               )}
 
-              <Link
+              {/* Dashboard */}
+              <NavLink
                 to={dashboardPath}
-                className="flex h-10 w-10 items-center justify-center rounded-xl text-gray-600 transition hover:bg-green-50 hover:text-green-600"
-                aria-label="Dashboard"
+                className={({ isActive }) =>
+                  `group flex h-10 items-center gap-2 rounded-xl border px-3.5 text-[13px] font-semibold transition-all duration-300 ${
+                    isActive
+                      ? "border-green-200 bg-green-50 text-green-700 shadow-sm"
+                      : "border-gray-200 bg-white text-gray-700 hover:border-green-200 hover:bg-green-50 hover:text-green-700"
+                  }`
+                }
               >
-                <LayoutDashboard size={19} strokeWidth={1.8} />
-              </Link>
+                <LayoutDashboard
+                  size={17}
+                  strokeWidth={1.9}
+                  className="transition-transform duration-300 group-hover:scale-105"
+                />
 
+                <span>Dashboard</span>
+              </NavLink>
+
+              {/* Profile */}
               <div className="relative ml-1">
                 <button
                   type="button"
                   onClick={() =>
                     setIsProfileOpen((prev) => !prev)
                   }
-                  className="flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-2.5 py-1.5 transition hover:border-gray-300 hover:bg-gray-50"
+                  className={`group flex h-11 items-center gap-2 rounded-xl border bg-white px-2 py-1.5 transition-all duration-300 ${
+                    isProfileOpen
+                      ? "border-green-200 bg-green-50/50 shadow-sm"
+                      : "border-gray-200 hover:border-gray-300 hover:bg-gray-50"
+                  }`}
                   aria-expanded={isProfileOpen}
                   aria-label="Open profile menu"
                 >
-                  {userPhoto ? (
-                    <img
-                      src={userPhoto}
-                      alt={userName}
-                      className="h-8 w-8 rounded-full object-cover"
-                    />
-                  ) : (
-                    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-green-100 text-sm font-bold text-green-700">
-                      {userInitial}
-                    </div>
-                  )}
+                  {/* Avatar */}
+                  <div className="relative">
+                    {userPhoto ? (
+                      <img
+                        src={userPhoto}
+                        alt={userName}
+                        className="h-8 w-8 rounded-lg object-cover ring-2 ring-white"
+                      />
+                    ) : (
+                      <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-green-100 to-green-200 text-sm font-bold text-green-700">
+                        {userInitial}
+                      </div>
+                    )}
 
-                  <div className="hidden text-left xl:block">
-                    <p className="max-w-[110px] truncate text-xs font-semibold text-gray-900">
+                    <span className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-white bg-green-500" />
+                  </div>
+
+                  <div className="hidden max-w-[110px] text-left xl:block">
+                    <p className="truncate text-xs font-bold text-gray-900">
                       {userName}
                     </p>
 
-                    <p className="max-w-[110px] truncate text-[11px] text-gray-500">
-                      {userEmail}
+                    <p className="mt-0.5 truncate text-[10px] text-gray-400">
+                      {roleLabel}
                     </p>
                   </div>
 
                   <ChevronDown
                     size={15}
-                    className={`text-gray-400 transition-transform ${
+                    className={`text-gray-400 transition-transform duration-300 ${
                       isProfileOpen ? "rotate-180" : ""
                     }`}
                   />
                 </button>
 
+                {/* Profile Dropdown */}
                 {isProfileOpen && (
-                  <div className="absolute right-0 top-12 z-50 w-64 overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-lg">
-                    <div className="border-b border-gray-100 p-4">
+                  <div className="absolute right-0 top-[calc(100%+10px)] z-50 w-72 origin-top-right animate-[navbarDrop_180ms_ease-out] overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-xl shadow-gray-200/50">
+                    {/* User Info */}
+                    <div className="border-b border-gray-100 bg-gradient-to-br from-gray-50 to-white p-4">
                       <div className="flex items-center gap-3">
                         {userPhoto ? (
                           <img
                             src={userPhoto}
                             alt={userName}
-                            className="h-11 w-11 rounded-full object-cover"
+                            className="h-12 w-12 rounded-xl object-cover"
                           />
                         ) : (
-                          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-green-100 text-base font-bold text-green-700">
+                          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-green-100 to-green-200 text-base font-bold text-green-700">
                             {userInitial}
                           </div>
                         )}
 
-                        <div className="min-w-0">
-                          <p className="truncate text-sm font-semibold text-gray-900">
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-bold text-gray-900">
                             {userName}
                           </p>
 
-                          <p className="truncate text-xs text-gray-500">
+                          <p className="mt-0.5 truncate text-xs text-gray-500">
                             {userEmail}
                           </p>
 
-                          <p
-                            className={`mt-1 text-[10px] font-semibold uppercase tracking-wide ${
-                              isAdmin
-                                ? "text-red-600"
-                                : isOwner
-                                ? "text-blue-600"
-                                : "text-green-600"
-                            }`}
+                          <span
+                            className={`mt-1.5 inline-flex rounded-md px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider ${getRoleColor()}`}
                           >
                             {roleLabel}
-                          </p>
+                          </span>
                         </div>
                       </div>
                     </div>
 
+                    {/* Menu */}
                     <div className="p-2">
                       <Link
                         to={dashboardPath}
                         onClick={closeProfile}
-                        className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
+                        className="group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-gray-700 transition-all duration-200 hover:bg-green-50 hover:text-green-700"
                       >
-                        <LayoutDashboard size={17} />
-                        Dashboard
+                        <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-gray-50 text-gray-500 transition group-hover:bg-white group-hover:text-green-600">
+                          <LayoutDashboard size={16} />
+                        </span>
+
+                        <span>Dashboard</span>
                       </Link>
 
                       {isAdmin && (
@@ -363,32 +492,46 @@ const Navbar = () => {
                           <Link
                             to="/admin/users"
                             onClick={closeProfile}
-                            className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
+                            className="group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-gray-700 transition-all duration-200 hover:bg-gray-50 hover:text-gray-950"
                           >
+                            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-gray-50 text-gray-500">
+                              <UserRound size={16} />
+                            </span>
                             Manage Users
                           </Link>
 
                           <Link
                             to="/admin/turfs"
                             onClick={closeProfile}
-                            className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
+                            className="group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-gray-700 transition-all duration-200 hover:bg-gray-50 hover:text-gray-950"
                           >
+                            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-gray-50 text-gray-500">
+                              <Search size={16} />
+                            </span>
                             Manage Turfs
                           </Link>
 
                           <Link
                             to="/admin/bookings"
                             onClick={closeProfile}
-                            className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
+                            className="group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-gray-700 transition-all duration-200 hover:bg-gray-50 hover:text-gray-950"
                           >
+                            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-gray-50 text-gray-500">
+                              <LayoutDashboard size={16} />
+                            </span>
                             Manage Bookings
                           </Link>
 
                           <Link
                             to="/admin/revenue"
                             onClick={closeProfile}
-                            className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
+                            className="group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-gray-700 transition-all duration-200 hover:bg-gray-50 hover:text-gray-950"
                           >
+                            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-gray-50 text-gray-500">
+                              <span className="text-xs font-bold">
+                                ৳
+                              </span>
+                            </span>
                             Revenue
                           </Link>
                         </>
@@ -397,9 +540,12 @@ const Navbar = () => {
                       <Link
                         to={profilePath}
                         onClick={closeProfile}
-                        className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
+                        className="group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-gray-700 transition-all duration-200 hover:bg-gray-50 hover:text-gray-950"
                       >
-                        <CircleUserRound size={17} />
+                        <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-gray-50 text-gray-500 transition group-hover:bg-white group-hover:text-gray-700">
+                          <CircleUserRound size={16} />
+                        </span>
+
                         My Profile
                       </Link>
 
@@ -407,21 +553,28 @@ const Navbar = () => {
                         <Link
                           to={wishlistPath}
                           onClick={closeProfile}
-                          className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
+                          className="group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-gray-700 transition-all duration-200 hover:bg-red-50 hover:text-red-600"
                         >
-                          <Heart size={17} />
+                          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-gray-50 text-gray-500 transition group-hover:bg-white group-hover:text-red-500">
+                            <Heart size={16} />
+                          </span>
+
                           Wishlist
                         </Link>
                       )}
                     </div>
 
+                    {/* Logout */}
                     <div className="border-t border-gray-100 p-2">
                       <button
                         type="button"
                         onClick={handleLogout}
-                        className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-red-600 transition hover:bg-red-50"
+                        className="group flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold text-red-600 transition-all duration-200 hover:bg-red-50"
                       >
-                        <LogOut size={17} />
+                        <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-red-50 transition group-hover:bg-white">
+                          <LogOut size={16} />
+                        </span>
+
                         Logout
                       </button>
                     </div>
@@ -431,112 +584,157 @@ const Navbar = () => {
             </>
           ) : (
             <>
+              {/* Login */}
               <Link
                 to="/login"
-                className="flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold text-gray-700 transition hover:bg-gray-100"
+                className="group flex h-10 items-center gap-2 rounded-xl px-4 text-[13px] font-semibold text-gray-600 transition-all duration-300 hover:bg-gray-50 hover:text-gray-950"
               >
-                <UserRound size={17} />
+                <UserRound
+                  size={16}
+                  className="transition-transform duration-300 group-hover:scale-105"
+                />
                 Login
               </Link>
 
+              {/* Register */}
               <Link
                 to="/register"
-                className="rounded-xl bg-green-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-green-700"
+                className="group relative flex h-10 items-center overflow-hidden rounded-xl bg-green-600 px-5 text-[13px] font-bold text-white shadow-sm shadow-green-600/20 transition-all duration-300 hover:-translate-y-0.5 hover:bg-green-700 hover:shadow-md hover:shadow-green-600/20"
               >
-                Get Started
+                <span className="relative z-10">
+                  Get Started
+                </span>
+
+                <span className="absolute inset-0 -translate-x-full bg-white/10 transition-transform duration-500 group-hover:translate-x-full" />
               </Link>
             </>
           )}
         </div>
 
+        {/* Mobile Menu Button */}
         <button
           type="button"
-          onClick={() =>
-            setIsMenuOpen((prev) => !prev)
-          }
-          className="flex h-10 w-10 items-center justify-center rounded-xl text-gray-700 transition hover:bg-gray-100 lg:hidden"
+          onClick={() => setIsMenuOpen((prev) => !prev)}
+          className={`flex h-10 w-10 items-center justify-center rounded-xl border transition-all duration-300 lg:hidden ${
+            isMenuOpen
+              ? "border-green-200 bg-green-50 text-green-700"
+              : "border-gray-200 text-gray-700 hover:bg-gray-50"
+          }`}
           aria-label={
             isMenuOpen ? "Close menu" : "Open menu"
           }
           aria-expanded={isMenuOpen}
         >
-          {isMenuOpen ? <X size={22} /> : <Menu size={22} />}
+          {isMenuOpen ? (
+            <X size={21} />
+          ) : (
+            <Menu size={21} />
+          )}
         </button>
       </div>
 
+      {/* Mobile Menu */}
       {isMenuOpen && (
         <div className="border-t border-gray-100 bg-white lg:hidden">
-          <div className="mx-auto max-w-7xl px-4 py-5 sm:px-6">
+          <div className="mx-auto max-w-7xl animate-[navbarMobile_220ms_ease-out] px-4 py-5 sm:px-6">
+            {/* Mobile User Card */}
             {!isUserLoading && currentUser && (
-              <div className="mb-4 flex items-center gap-3 rounded-2xl bg-gray-50 p-4">
-                {userPhoto ? (
-                  <img
-                    src={userPhoto}
-                    alt={userName}
-                    className="h-11 w-11 rounded-full object-cover"
-                  />
-                ) : (
-                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-green-100 text-base font-bold text-green-700">
-                    {userInitial}
+              <div className="mb-4 rounded-2xl border border-gray-100 bg-gradient-to-br from-gray-50 to-white p-4 shadow-sm">
+                <div className="flex items-center gap-3">
+                  {userPhoto ? (
+                    <img
+                      src={userPhoto}
+                      alt={userName}
+                      className="h-11 w-11 rounded-xl object-cover"
+                    />
+                  ) : (
+                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-green-100 text-base font-bold text-green-700">
+                      {userInitial}
+                    </div>
+                  )}
+
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-bold text-gray-900">
+                      {userName}
+                    </p>
+
+                    <p className="truncate text-xs text-gray-500">
+                      {userEmail}
+                    </p>
+
+                    <span
+                      className={`mt-1.5 inline-flex rounded-md px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider ${getRoleColor()}`}
+                    >
+                      {roleLabel}
+                    </span>
                   </div>
-                )}
-
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-semibold text-gray-900">
-                    {userName}
-                  </p>
-
-                  <p className="truncate text-xs text-gray-500">
-                    {userEmail}
-                  </p>
-
-                  <p
-                    className={`mt-1 text-[11px] font-medium uppercase tracking-wide ${
-                      isAdmin
-                        ? "text-red-600"
-                        : isOwner
-                        ? "text-blue-600"
-                        : "text-green-600"
-                    }`}
-                  >
-                    {roleLabel}
-                  </p>
                 </div>
               </div>
             )}
 
+            {/* Mobile Navigation */}
             <nav className="flex flex-col gap-1">
-              {navLinks.map((link) => (
-                <NavLink
-                  key={link.path}
-                  to={link.path}
-                  onClick={closeMenu}
-                  className={({ isActive }) =>
-                    `rounded-xl px-4 py-3 text-sm font-medium transition ${
-                      isActive
-                        ? "bg-green-50 text-green-600"
-                        : "text-gray-700 hover:bg-gray-50"
-                    }`
-                  }
-                >
-                  {link.name}
-                </NavLink>
-              ))}
+              {navLinks.map((link) => {
+                const Icon = link.icon;
+
+                return (
+                  <NavLink
+                    key={link.path}
+                    to={link.path}
+                    end={link.end}
+                    onClick={closeMenu}
+                    className={({ isActive }) =>
+                      `group flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-semibold transition-all duration-300 ${
+                        isActive
+                          ? "bg-green-50 text-green-700 shadow-sm"
+                          : "text-gray-700 hover:bg-gray-50 hover:text-gray-950"
+                      }`
+                    }
+                  >
+                    {({ isActive }) => (
+                      <>
+                        {Icon && (
+                          <Icon
+                            size={17}
+                            className={`transition-transform duration-300 ${
+                              isActive
+                                ? "scale-105"
+                                : "group-hover:translate-x-0.5"
+                            }`}
+                          />
+                        )}
+
+                        <span>{link.name}</span>
+
+                        {isActive && (
+                          <span className="ml-auto h-1.5 w-1.5 rounded-full bg-green-600" />
+                        )}
+                      </>
+                    )}
+                  </NavLink>
+                );
+              })}
 
               {!isUserLoading && currentUser && (
                 <>
+                  <div className="my-2 border-t border-gray-100" />
+
                   <NavLink
                     to={dashboardPath}
                     onClick={closeMenu}
                     className={({ isActive }) =>
-                      `mt-2 flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition ${
+                      `group flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-semibold transition-all duration-300 ${
                         isActive
-                          ? "bg-green-50 text-green-600"
+                          ? "bg-green-50 text-green-700"
                           : "text-gray-700 hover:bg-gray-50"
                       }`
                     }
                   >
-                    <LayoutDashboard size={18} />
+                    <LayoutDashboard
+                      size={18}
+                      className="transition-transform duration-300 group-hover:scale-105"
+                    />
+
                     Dashboard
                   </NavLink>
 
@@ -547,6 +745,7 @@ const Navbar = () => {
                         onClick={closeMenu}
                         className="flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
                       >
+                        <UserRound size={18} />
                         Manage Users
                       </NavLink>
 
@@ -555,6 +754,7 @@ const Navbar = () => {
                         onClick={closeMenu}
                         className="flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
                       >
+                        <Search size={18} />
                         Manage Turfs
                       </NavLink>
 
@@ -563,6 +763,7 @@ const Navbar = () => {
                         onClick={closeMenu}
                         className="flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
                       >
+                        <LayoutDashboard size={18} />
                         Manage Bookings
                       </NavLink>
 
@@ -571,6 +772,9 @@ const Navbar = () => {
                         onClick={closeMenu}
                         className="flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
                       >
+                        <span className="text-sm font-bold">
+                          ৳
+                        </span>
                         Revenue
                       </NavLink>
                     </>
@@ -581,10 +785,10 @@ const Navbar = () => {
                       to={wishlistPath}
                       onClick={closeMenu}
                       className={({ isActive }) =>
-                        `flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition ${
+                        `group flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-semibold transition-all duration-300 ${
                           isActive
-                            ? "bg-red-50 text-red-500"
-                            : "text-gray-700 hover:bg-gray-50"
+                            ? "bg-red-50 text-red-600"
+                            : "text-gray-700 hover:bg-red-50 hover:text-red-600"
                         }`
                       }
                     >
@@ -597,9 +801,9 @@ const Navbar = () => {
                     to={profilePath}
                     onClick={closeMenu}
                     className={({ isActive }) =>
-                      `flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition ${
+                      `group flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-semibold transition-all duration-300 ${
                         isActive
-                          ? "bg-green-50 text-green-600"
+                          ? "bg-gray-100 text-gray-900"
                           : "text-gray-700 hover:bg-gray-50"
                       }`
                     }
@@ -611,6 +815,7 @@ const Navbar = () => {
               )}
             </nav>
 
+            {/* Mobile Bottom Actions */}
             <div className="mt-4 border-t border-gray-100 pt-4">
               {isUserLoading ? (
                 <div className="h-12 animate-pulse rounded-xl bg-gray-100" />
@@ -618,7 +823,7 @@ const Navbar = () => {
                 <button
                   type="button"
                   onClick={handleLogout}
-                  className="flex w-full items-center justify-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-600 transition hover:bg-red-100"
+                  className="flex w-full items-center justify-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-600 transition-all duration-300 hover:bg-red-100"
                 >
                   <LogOut size={17} />
                   Logout
@@ -628,7 +833,7 @@ const Navbar = () => {
                   <Link
                     to="/login"
                     onClick={closeMenu}
-                    className="flex items-center justify-center gap-2 rounded-xl border border-gray-200 px-4 py-3 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
+                    className="flex items-center justify-center gap-2 rounded-xl border border-gray-200 px-4 py-3 text-sm font-semibold text-gray-700 transition-all duration-300 hover:bg-gray-50"
                   >
                     <UserRound size={17} />
                     Login
@@ -637,7 +842,7 @@ const Navbar = () => {
                   <Link
                     to="/register"
                     onClick={closeMenu}
-                    className="flex items-center justify-center rounded-xl bg-green-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-green-700"
+                    className="flex items-center justify-center rounded-xl bg-green-600 px-4 py-3 text-sm font-bold text-white transition-all duration-300 hover:bg-green-700"
                   >
                     Get Started
                   </Link>
@@ -647,6 +852,41 @@ const Navbar = () => {
           </div>
         </div>
       )}
+
+      {/* Navbar Animations */}
+      <style>{`
+        @keyframes navbarDrop {
+          from {
+            opacity: 0;
+            transform: translateY(-6px) scale(0.98);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+          }
+        }
+
+        @keyframes navbarMobile {
+          from {
+            opacity: 0;
+            transform: translateY(-8px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+          *,
+          *::before,
+          *::after {
+            animation-duration: 0.01ms !important;
+            animation-iteration-count: 1 !important;
+            transition-duration: 0.01ms !important;
+          }
+        }
+      `}</style>
     </header>
   );
 };

@@ -49,7 +49,9 @@ const BookingSection = () => {
 
   useEffect(() => {
     const fetchTurf = async () => {
-      if (!turfId) {
+      const id = decodeURIComponent(String(turfId || "")).trim();
+
+      if (!id) {
         setError("Invalid turf ID.");
         setLoading(false);
         return;
@@ -60,19 +62,30 @@ const BookingSection = () => {
         setError("");
 
         const response = await fetch(
-          `${API_URL}/turfs/${encodeURIComponent(turfId)}`
+          `${API_URL}/turfs/${encodeURIComponent(id)}`
         );
 
-        const data = await response.json();
+        const data = await response.json().catch(() => ({}));
 
         if (!response.ok) {
-          throw new Error(data?.message || "Failed to load turf.");
+          throw new Error(
+            data?.message || "Failed to load turf."
+          );
         }
 
-        setTurf(data);
+        const turfData = data?.turf || data?.data || data;
+
+        if (!turfData || typeof turfData !== "object") {
+          throw new Error("Invalid turf data received.");
+        }
+
+        setTurf(turfData);
       } catch (error) {
         console.error("Failed to load turf:", error);
-        setError(error.message || "Failed to load turf.");
+        setTurf(null);
+        setError(
+          error?.message || "Failed to load turf."
+        );
       } finally {
         setLoading(false);
       }
@@ -85,7 +98,10 @@ const BookingSection = () => {
     return (
       <main className="flex min-h-[70vh] items-center justify-center bg-gray-50">
         <div className="flex items-center gap-3 text-sm text-gray-500">
-          <Loader2 size={20} className="animate-spin text-green-600" />
+          <Loader2
+            size={20}
+            className="animate-spin text-green-600"
+          />
           Loading turf...
         </div>
       </main>
@@ -101,7 +117,8 @@ const BookingSection = () => {
           </h1>
 
           <p className="mt-3 text-sm text-gray-500">
-            {error || "The turf you are trying to book does not exist."}
+            {error ||
+              "The turf you are trying to book does not exist."}
           </p>
 
           <Link
@@ -116,12 +133,22 @@ const BookingSection = () => {
     );
   }
 
-  const turfIdValue = String(turf._id);
+  const turfIdValue = String(
+    turf._id || turf.id || ""
+  ).trim();
+
   const turfName = turf.name || "Unnamed Turf";
+
   const turfImage =
-    turf.image || FALLBACK_IMAGE;
+    typeof turf.image === "string" && turf.image.trim()
+      ? turf.image
+      : FALLBACK_IMAGE;
+
   const turfLocation =
-    turf.location || "Dhaka, Bangladesh";
+    turf.location ||
+    turf.area ||
+    "Dhaka, Bangladesh";
+
   const turfRating =
     turf.rating !== undefined &&
     turf.rating !== null &&
@@ -136,7 +163,9 @@ const BookingSection = () => {
   const getNextTime = (time) => {
     const [timeValue, period] = time.split(" ");
 
-    let [hours, minutes] = timeValue.split(":").map(Number);
+    let [hours, minutes] = timeValue
+      .split(":")
+      .map(Number);
 
     if (period === "PM" && hours !== 12) {
       hours += 12;
@@ -173,11 +202,12 @@ const BookingSection = () => {
 
   return (
     <main className="min-h-screen bg-gray-50">
-      {/* Header */}
       <section className="border-b border-gray-200 bg-white">
         <div className="mx-auto max-w-7xl px-4 py-5 sm:px-6 lg:px-8">
           <Link
-            to={`/turfs/${turfIdValue}`}
+            to={`/turfs/${encodeURIComponent(
+              turfIdValue
+            )}`}
             className="inline-flex items-center gap-2 text-sm font-medium text-gray-500 transition hover:text-green-600"
           >
             <ArrowLeft size={16} />
@@ -186,10 +216,8 @@ const BookingSection = () => {
         </div>
       </section>
 
-      {/* Main */}
       <section className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 lg:py-10">
         <div className="grid gap-8 lg:grid-cols-[1fr_420px]">
-          {/* Turf Information */}
           <div>
             <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white">
               <div className="relative h-64 sm:h-80">
@@ -277,7 +305,7 @@ const BookingSection = () => {
                     </p>
 
                     <p className="mt-1 text-sm font-semibold text-gray-900">
-                      ৳{turfPrice.toLocaleString()} / hour
+                      ৳{turfPrice.toLocaleString("en-BD")} / hour
                     </p>
                   </div>
                 </div>
@@ -285,7 +313,6 @@ const BookingSection = () => {
             </div>
           </div>
 
-          {/* Booking Card */}
           <aside className="h-fit rounded-2xl border border-gray-200 bg-white p-5 shadow-sm sm:p-6 lg:sticky lg:top-24">
             <div className="flex items-center gap-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-green-50 text-green-600">
@@ -303,7 +330,6 @@ const BookingSection = () => {
               </div>
             </div>
 
-            {/* Date */}
             <div className="mt-6">
               <label
                 htmlFor="booking-date"
@@ -328,9 +354,7 @@ const BookingSection = () => {
                       .split("T")[0]
                   }
                   onChange={(event) => {
-                    setSelectedDate(
-                      event.target.value
-                    );
+                    setSelectedDate(event.target.value);
                     setSelectedSlot("");
                   }}
                   className="h-12 w-full rounded-xl border border-gray-200 bg-white pl-10 pr-4 text-sm text-gray-700 outline-none transition focus:border-green-500 focus:ring-4 focus:ring-green-500/10"
@@ -338,7 +362,6 @@ const BookingSection = () => {
               </div>
             </div>
 
-            {/* Time Slots */}
             <div className="mt-6">
               <div className="flex items-center justify-between">
                 <label className="text-sm font-medium text-gray-900">
@@ -376,10 +399,7 @@ const BookingSection = () => {
                             : "border-gray-200 bg-white text-gray-600 hover:border-green-400 hover:bg-green-50 hover:text-green-700"
                         }`}
                       >
-                        {isSelected && (
-                          <Check size={14} />
-                        )}
-
+                        {isSelected && <Check size={14} />}
                         {slot}
                       </button>
                     );
@@ -388,7 +408,6 @@ const BookingSection = () => {
               )}
             </div>
 
-            {/* Summary */}
             {bookingReady && (
               <div className="mt-6 rounded-xl bg-gray-50 p-4">
                 <h3 className="text-sm font-semibold text-gray-900">
@@ -404,14 +423,11 @@ const BookingSection = () => {
                     <span className="font-medium text-gray-900">
                       {new Date(
                         `${selectedDate}T00:00:00`
-                      ).toLocaleDateString(
-                        "en-BD",
-                        {
-                          day: "numeric",
-                          month: "short",
-                          year: "numeric",
-                        }
-                      )}
+                      ).toLocaleDateString("en-BD", {
+                        day: "numeric",
+                        month: "short",
+                        year: "numeric",
+                      })}
                     </span>
                   </div>
 
@@ -422,8 +438,7 @@ const BookingSection = () => {
                     </span>
 
                     <span className="font-medium text-gray-900">
-                      {selectedSlot} -{" "}
-                      {selectedEndTime}
+                      {selectedSlot} - {selectedEndTime}
                     </span>
                   </div>
 
@@ -435,7 +450,7 @@ const BookingSection = () => {
                         </p>
 
                         <p className="mt-1 text-xl font-bold text-gray-900">
-                          ৳{turfPrice.toLocaleString()}
+                          ৳{turfPrice.toLocaleString("en-BD")}
                         </p>
                       </div>
 
@@ -448,10 +463,11 @@ const BookingSection = () => {
               </div>
             )}
 
-            {/* Continue */}
             {bookingReady ? (
               <Link
-                to={`/booking/${turfIdValue}?date=${selectedDate}&slot=${encodeURIComponent(
+                to={`/booking/${encodeURIComponent(
+                  turfIdValue
+                )}?date=${selectedDate}&slot=${encodeURIComponent(
                   selectedSlot
                 )}`}
                 className="mt-6 inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-green-600 px-5 text-sm font-semibold text-white transition hover:bg-green-700"

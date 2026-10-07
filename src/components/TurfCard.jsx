@@ -26,8 +26,7 @@ const TurfCard = ({ turf }) => {
   const [wishlistChecking, setWishlistChecking] = useState(false);
   const [wishlistAnimation, setWishlistAnimation] = useState(false);
 
-  // MongoDB _id is the primary turf ID
-  const turfId = turf?._id ? String(turf._id).trim() : "";
+  const turfId = String(turf?.id || "").trim();
 
   const turfName = String(turf?.name || "Unnamed Turf").trim();
 
@@ -36,8 +35,9 @@ const TurfCard = ({ turf }) => {
       ? turf.image.trim()
       : FALLBACK_IMAGE;
 
-  const turfLocation =
-    String(turf?.location || turf?.area || "Dhaka, Bangladesh").trim();
+  const turfLocation = String(
+    turf?.location || turf?.area || "Dhaka, Bangladesh"
+  ).trim();
 
   const turfArea = String(turf?.area || "").trim();
 
@@ -53,13 +53,16 @@ const TurfCard = ({ turf }) => {
     turf?.rating !== undefined &&
     turf?.rating !== null &&
     turf?.rating !== "" &&
-    !Number.isNaN(ratingValue);
+    Number.isFinite(ratingValue);
 
   const turfRating = hasRating ? ratingValue : null;
 
-  const turfPrice = Number(turf?.price);
+  const priceValue = Number(turf?.price);
 
-  const safePrice = Number.isFinite(turfPrice) ? turfPrice : 0;
+  const safePrice =
+    Number.isFinite(priceValue) && priceValue >= 0
+      ? priceValue
+      : 0;
 
   const userEmail = currentUser?.email
     ? String(currentUser.email).trim().toLowerCase()
@@ -98,7 +101,9 @@ const TurfCard = ({ turf }) => {
 
         setIsWishlisted(Boolean(data?.wishlisted));
       } catch (error) {
-        if (error.name === "AbortError") return;
+        if (error.name === "AbortError") {
+          return;
+        }
 
         console.error("Wishlist status error:", error);
         setIsWishlisted(false);
@@ -135,7 +140,7 @@ const TurfCard = ({ turf }) => {
       await Swal.fire({
         icon: "error",
         title: "Invalid turf",
-        text: "This turf does not have a valid MongoDB ID.",
+        text: "This turf does not have a valid ID.",
         confirmButtonColor: "#16a34a",
       });
 
@@ -164,7 +169,8 @@ const TurfCard = ({ turf }) => {
 
       if (!response.ok) {
         throw new Error(
-          data?.message || `Wishlist request failed (${response.status})`
+          data?.message ||
+            `Wishlist request failed (${response.status})`
         );
       }
 
@@ -248,7 +254,9 @@ const TurfCard = ({ turf }) => {
               isWishlisted
                 ? "text-red-500"
                 : "text-gray-600 hover:text-red-500"
-            } ${wishlistAnimation ? "scale-125" : ""}`}
+            } ${
+              wishlistAnimation ? "scale-125" : ""
+            }`}
           >
             {wishlistAnimation && (
               <span className="pointer-events-none absolute inset-0 animate-ping rounded-full bg-red-400/30" />
@@ -307,7 +315,9 @@ const TurfCard = ({ turf }) => {
               fill={hasRating ? "currentColor" : "none"}
             />
 
-            <span>{hasRating ? turfRating : "New"}</span>
+            <span>
+              {hasRating ? turfRating : "New"}
+            </span>
           </div>
         </div>
 
@@ -343,7 +353,6 @@ const TurfCard = ({ turf }) => {
 
             <p className="mt-1 text-lg font-bold text-gray-900">
               ৳{safePrice.toLocaleString("en-BD")}
-
               <span className="ml-1 text-xs font-normal text-gray-400">
                 / hour
               </span>

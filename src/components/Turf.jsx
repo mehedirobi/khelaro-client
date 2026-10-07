@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   Search,
@@ -6,13 +6,10 @@ import {
   X,
   ChevronDown,
   Map,
-  LoaderCircle,
-  RefreshCw,
 } from "lucide-react";
 
 import TurfCard from "../components/TurfCard";
-
-const API_URL = "http://localhost:3000";
+import { turfs } from "../data/turfs";
 
 const locations = [
   "All locations",
@@ -28,67 +25,11 @@ const locations = [
 const sports = ["All sports", "Football", "Cricket", "Badminton"];
 
 const Turf = () => {
-  const [turfs, setTurfs] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-
   const [search, setSearch] = useState("");
   const [location, setLocation] = useState("All locations");
   const [sport, setSport] = useState("All sports");
   const [sort, setSort] = useState("recommended");
   const [showFilters, setShowFilters] = useState(false);
-
-  const fetchTurfs = async () => {
-    const controller = new AbortController();
-
-    try {
-      setLoading(true);
-      setError("");
-
-      const response = await fetch(`${API_URL}/turfs`, {
-        method: "GET",
-        signal: controller.signal,
-      });
-
-      if (!response.ok) {
-        throw new Error(`Failed to load turfs (${response.status})`);
-      }
-
-      const data = await response.json();
-
-      const turfList = Array.isArray(data)
-        ? data
-        : Array.isArray(data.turfs)
-          ? data.turfs
-          : [];
-
-      setTurfs(turfList);
-    } catch (err) {
-      if (err.name === "AbortError") return;
-
-      console.error("Failed to load turfs:", err);
-      setTurfs([]);
-      setError("Failed to load turfs. Please try again.");
-    } finally {
-      if (!controller.signal.aborted) {
-        setLoading(false);
-      }
-    }
-
-    return () => controller.abort();
-  };
-
-  useEffect(() => {
-    let cleanup;
-
-    fetchTurfs().then((cleanupFunction) => {
-      cleanup = cleanupFunction;
-    });
-
-    return () => {
-      if (cleanup) cleanup();
-    };
-  }, []);
 
   const filteredTurfs = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -102,11 +43,11 @@ const Turf = () => {
 
       const features = Array.isArray(turf.features)
         ? turf.features.join(" ").toLowerCase()
-        : String(turf.features || "").toLowerCase();
+        : "";
 
       const amenities = Array.isArray(turf.amenities)
         ? turf.amenities.join(" ").toLowerCase()
-        : String(turf.amenities || "").toLowerCase();
+        : "";
 
       const matchesSearch =
         !query ||
@@ -118,12 +59,12 @@ const Turf = () => {
         features.includes(query) ||
         amenities.includes(query);
 
-      const normalizedSelectedLocation = location.toLowerCase();
+      const selectedLocation = location.toLowerCase();
 
       const matchesLocation =
         location === "All locations" ||
-        area === normalizedSelectedLocation ||
-        turfLocation.includes(normalizedSelectedLocation);
+        area === selectedLocation ||
+        turfLocation.includes(selectedLocation);
 
       const matchesSport =
         sport === "All sports" ||
@@ -132,28 +73,22 @@ const Turf = () => {
       return matchesSearch && matchesLocation && matchesSport;
     });
 
-    const sortedTurfs = [...result];
+    const sorted = [...result];
 
     if (sort === "price-low") {
-      sortedTurfs.sort(
-        (a, b) => Number(a.price || 0) - Number(b.price || 0)
-      );
+      sorted.sort((a, b) => Number(a.price || 0) - Number(b.price || 0));
     }
 
     if (sort === "price-high") {
-      sortedTurfs.sort(
-        (a, b) => Number(b.price || 0) - Number(a.price || 0)
-      );
+      sorted.sort((a, b) => Number(b.price || 0) - Number(a.price || 0));
     }
 
     if (sort === "rating") {
-      sortedTurfs.sort(
-        (a, b) => Number(b.rating || 0) - Number(a.rating || 0)
-      );
+      sorted.sort((a, b) => Number(b.rating || 0) - Number(a.rating || 0));
     }
 
-    return sortedTurfs;
-  }, [turfs, search, location, sport, sort]);
+    return sorted;
+  }, [search, location, sport, sort]);
 
   const clearFilters = () => {
     setSearch("");
@@ -200,7 +135,6 @@ const Turf = () => {
             <div className="relative flex-1">
               <Search
                 size={19}
-                aria-hidden="true"
                 className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400"
               />
 
@@ -242,7 +176,7 @@ const Turf = () => {
                   <button
                     type="button"
                     onClick={clearFilters}
-                    className="text-xs font-medium text-green-600 transition hover:text-green-700"
+                    className="text-xs font-medium text-green-600 hover:text-green-700"
                   >
                     Clear all
                   </button>
@@ -269,10 +203,7 @@ const Turf = () => {
                       <span>{item}</span>
 
                       {location === item && (
-                        <span
-                          aria-hidden="true"
-                          className="h-1.5 w-1.5 rounded-full bg-green-600"
-                        />
+                        <span className="h-1.5 w-1.5 rounded-full bg-green-600" />
                       )}
                     </button>
                   ))}
@@ -299,10 +230,7 @@ const Turf = () => {
                       <span>{item}</span>
 
                       {sport === item && (
-                        <span
-                          aria-hidden="true"
-                          className="h-1.5 w-1.5 rounded-full bg-green-600"
-                        />
+                        <span className="h-1.5 w-1.5 rounded-full bg-green-600" />
                       )}
                     </button>
                   ))}
@@ -315,7 +243,7 @@ const Turf = () => {
             <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <p className="text-sm text-gray-500">
                 <span className="font-semibold text-gray-900">
-                  {loading ? 0 : filteredTurfs.length}
+                  {filteredTurfs.length}
                 </span>{" "}
                 {filteredTurfs.length === 1 ? "turf" : "turfs"} found
               </p>
@@ -333,7 +261,7 @@ const Turf = () => {
                     id="sort"
                     value={sort}
                     onChange={(event) => setSort(event.target.value)}
-                    className="h-10 appearance-none rounded-lg border border-gray-200 bg-white pl-3 pr-9 text-sm text-gray-700 outline-none transition focus:border-green-500 focus:ring-2 focus:ring-green-500/10"
+                    className="h-10 appearance-none rounded-lg border border-gray-200 bg-white pl-3 pr-9 text-sm text-gray-700 outline-none focus:border-green-500 focus:ring-2 focus:ring-green-500/10"
                   >
                     <option value="recommended">Recommended</option>
                     <option value="rating">Highest rated</option>
@@ -343,7 +271,6 @@ const Turf = () => {
 
                   <ChevronDown
                     size={15}
-                    aria-hidden="true"
                     className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-gray-400"
                   />
                 </div>
@@ -364,9 +291,9 @@ const Turf = () => {
                   <button
                     type="button"
                     onClick={() => setSearch("")}
-                    className="inline-flex items-center gap-1.5 rounded-full bg-green-50 px-3 py-1.5 text-xs font-medium text-green-700 transition hover:bg-green-100"
+                    className="inline-flex items-center gap-1.5 rounded-full bg-green-50 px-3 py-1.5 text-xs font-medium text-green-700"
                   >
-                    <span>Search: {search}</span>
+                    Search: {search}
                     <X size={13} />
                   </button>
                 )}
@@ -375,9 +302,9 @@ const Turf = () => {
                   <button
                     type="button"
                     onClick={() => setLocation("All locations")}
-                    className="inline-flex items-center gap-1.5 rounded-full bg-green-50 px-3 py-1.5 text-xs font-medium text-green-700 transition hover:bg-green-100"
+                    className="inline-flex items-center gap-1.5 rounded-full bg-green-50 px-3 py-1.5 text-xs font-medium text-green-700"
                   >
-                    <span>{location}</span>
+                    {location}
                     <X size={13} />
                   </button>
                 )}
@@ -386,75 +313,25 @@ const Turf = () => {
                   <button
                     type="button"
                     onClick={() => setSport("All sports")}
-                    className="inline-flex items-center gap-1.5 rounded-full bg-green-50 px-3 py-1.5 text-xs font-medium text-green-700 transition hover:bg-green-100"
+                    className="inline-flex items-center gap-1.5 rounded-full bg-green-50 px-3 py-1.5 text-xs font-medium text-green-700"
                   >
-                    <span>{sport}</span>
+                    {sport}
                     <X size={13} />
                   </button>
                 )}
               </div>
             )}
 
-            {loading ? (
-              <div className="rounded-2xl border border-gray-200 bg-white px-6 py-20 text-center">
-                <LoaderCircle
-                  size={28}
-                  className="mx-auto animate-spin text-green-600"
-                  aria-hidden="true"
-                />
-
-                <h3 className="mt-5 font-semibold text-gray-900">
-                  Loading turfs...
-                </h3>
-
-                <p className="mt-2 text-sm text-gray-500">
-                  Please wait while we load available turfs.
-                </p>
-              </div>
-            ) : error ? (
-              <div className="rounded-2xl border border-red-100 bg-white px-6 py-16 text-center">
-                <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-red-50">
-                  <RefreshCw
-                    size={24}
-                    aria-hidden="true"
-                    className="text-red-500"
-                  />
-                </div>
-
-                <h3 className="mt-5 font-semibold text-gray-900">
-                  Unable to load turfs
-                </h3>
-
-                <p className="mx-auto mt-2 max-w-sm text-sm leading-6 text-gray-500">
-                  {error}
-                </p>
-
-                <button
-                  type="button"
-                  onClick={fetchTurfs}
-                  className="mt-5 inline-flex items-center gap-2 rounded-lg bg-gray-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-green-600"
-                >
-                  <RefreshCw size={16} />
-                  Try again
-                </button>
-              </div>
-            ) : filteredTurfs.length > 0 ? (
+            {filteredTurfs.length > 0 ? (
               <div className="grid gap-5 md:grid-cols-2">
                 {filteredTurfs.map((turf) => (
-                  <TurfCard
-                    key={turf._id}
-                    turf={turf}
-                  />
+                  <TurfCard key={turf.id} turf={turf} />
                 ))}
               </div>
             ) : (
               <div className="rounded-2xl border border-gray-200 bg-white px-6 py-16 text-center">
                 <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-gray-100">
-                  <Search
-                    size={24}
-                    aria-hidden="true"
-                    className="text-gray-400"
-                  />
+                  <Search size={24} className="text-gray-400" />
                 </div>
 
                 <h3 className="mt-5 font-semibold text-gray-900">

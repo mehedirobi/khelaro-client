@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import {
   ArrowLeft,
@@ -7,9 +8,17 @@ import {
   CheckCircle2,
   CreditCard,
   ShieldCheck,
+  Loader2,
+  AlertCircle,
+  RefreshCw,
 } from "lucide-react";
 
-import { turfs } from "../data/turfs";
+const API_URL = (
+  import.meta.env.VITE_API_URL || "http://localhost:3000"
+).replace(/\/$/, "");
+
+const FALLBACK_IMAGE =
+  "https://placehold.co/1200x800?text=No+Turf+Image";
 
 const BookingConfirmation = () => {
   const { id } = useParams();
@@ -18,30 +27,142 @@ const BookingConfirmation = () => {
   const date = searchParams.get("date");
   const slot = searchParams.get("slot");
 
-  const turf = turfs.find((item) => item.id === id);
+  const [turf, setTurf] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    const controller = new AbortController();
+
+    const fetchTurf = async () => {
+      const turfId = decodeURIComponent(String(id || "")).trim();
+
+      if (!turfId) {
+        setError("Invalid turf ID.");
+        setLoading(false);
+        return;
+      }
+
+      try {
+        setLoading(true);
+        setError("");
+
+        const response = await fetch(
+          `${API_URL}/turfs/${encodeURIComponent(turfId)}`,
+          {
+            method: "GET",
+            signal: controller.signal,
+          }
+        );
+
+        const data = await response.json().catch(() => ({}));
+
+        if (!response.ok) {
+          throw new Error(
+            data?.message || "Failed to load turf."
+          );
+        }
+
+        const turfData = data?.turf || data?.data || data;
+
+        if (!turfData || typeof turfData !== "object") {
+          throw new Error("Invalid turf data received.");
+        }
+
+        setTurf(turfData);
+      } catch (error) {
+        if (error.name === "AbortError") {
+          return;
+        }
+
+        console.error("Failed to load turf:", error);
+
+        setTurf(null);
+        setError(
+          error?.message || "Failed to load turf."
+        );
+      } finally {
+        if (!controller.signal.aborted) {
+          setLoading(false);
+        }
+      }
+    };
+
+    fetchTurf();
+
+    return () => {
+      controller.abort();
+    };
+  }, [id]);
+
+  if (loading) {
+    return (
+      <main className="flex min-h-[70vh] items-center justify-center bg-gray-50 px-4">
+        <div className="text-center">
+          <Loader2
+            size={32}
+            className="mx-auto animate-spin text-green-600"
+          />
+
+          <h1 className="mt-5 text-xl font-semibold text-gray-900">
+            Loading booking...
+          </h1>
+
+          <p className="mt-2 text-sm text-gray-500">
+            Please wait while we load the turf details.
+          </p>
+        </div>
+      </main>
+    );
+  }
 
   if (!turf) {
     return (
       <main className="flex min-h-[70vh] items-center justify-center bg-gray-50 px-4">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold text-gray-900">Turf not found</h1>
+        <div className="max-w-md text-center">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-red-50">
+            <AlertCircle
+              size={26}
+              className="text-red-500"
+            />
+          </div>
 
-          <p className="mt-2 text-sm text-gray-500">
-            The turf you are trying to book does not exist.
+          <h1 className="mt-5 text-2xl font-bold text-gray-900">
+            Unable to load turf
+          </h1>
+
+          <p className="mt-3 text-sm leading-6 text-gray-500">
+            {error || "The requested turf could not be found."}
           </p>
 
-          <Link
-            to="/turfs"
-            className="mt-5 inline-flex rounded-xl bg-green-600 px-5 py-3 text-sm font-semibold text-white hover:bg-green-700"
-          >
-            Back to Turfs
-          </Link>
+          <div className="mt-6 flex flex-col justify-center gap-3 sm:flex-row">
+            <button
+              type="button"
+              onClick={() => window.location.reload()}
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-gray-900 px-5 py-3 text-sm font-semibold text-white transition hover:bg-gray-800"
+            >
+              <RefreshCw size={16} />
+              Try again
+            </button>
+
+            <Link
+              to="/turfs"
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-green-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-green-700"
+            >
+              <ArrowLeft size={17} />
+              Back to Turfs
+            </Link>
+          </div>
         </div>
       </main>
     );
   }
 
   if (!date || !slot) {
+    const turfId = String(
+      turf._id || turf.id || id
+    );
+
     return (
       <main className="flex min-h-[70vh] items-center justify-center bg-gray-50 px-4">
         <div className="max-w-md rounded-2xl bg-white p-8 text-center shadow-sm">
@@ -54,9 +175,10 @@ const BookingConfirmation = () => {
           </p>
 
           <Link
-            to={`/turfs/${turf.id}/book`}
-            className="mt-6 inline-flex rounded-xl bg-green-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-green-700"
+            to={`/turfs/${encodeURIComponent(turfId)}/book`}
+            className="mt-6 inline-flex items-center gap-2 rounded-xl bg-green-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-green-700"
           >
+            <CalendarDays size={17} />
             Select Booking Time
           </Link>
         </div>
@@ -64,26 +186,66 @@ const BookingConfirmation = () => {
     );
   }
 
-  const formattedDate = new Date(`${date}T00:00:00`).toLocaleDateString(
-    "en-BD",
-    {
-      weekday: "long",
-      day: "numeric",
-      month: "long",
-      year: "numeric",
-    },
-  );
+  const turfId = String(
+    turf._id || turf.id || id
+  ).trim();
+
+  const turfName = String(
+    turf.name || "Unnamed Turf"
+  ).trim();
+
+  const turfImage =
+    typeof turf.image === "string" &&
+    turf.image.trim()
+      ? turf.image.trim()
+      : FALLBACK_IMAGE;
+
+  const turfLocation = String(
+    turf.location ||
+      turf.area ||
+      "Dhaka, Bangladesh"
+  ).trim();
+
+  const turfSport = String(
+    turf.sport || "Sports Turf"
+  ).trim();
+
+  const turfPriceValue = Number(turf.price);
+
+  const turfPrice =
+    Number.isFinite(turfPriceValue) &&
+    turfPriceValue >= 0
+      ? turfPriceValue
+      : 0;
 
   const serviceFee = 50;
-  const totalPrice = turf.price + serviceFee;
+  const totalPrice = turfPrice + serviceFee;
+
+  const formattedDate = new Date(
+    `${date}T00:00:00`
+  ).toLocaleDateString("en-BD", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
+
+  const bookingUrl = `/turfs/${encodeURIComponent(
+    turfId
+  )}/book`;
+
+  const paymentUrl = `/payment/${encodeURIComponent(
+    turfId
+  )}?date=${encodeURIComponent(
+    date
+  )}&slot=${encodeURIComponent(slot)}`;
 
   return (
     <main className="min-h-screen bg-gray-50">
-      {/* Header */}
       <section className="border-b border-gray-200 bg-white">
         <div className="mx-auto max-w-6xl px-4 py-5 sm:px-6 lg:px-8">
           <Link
-            to={`/turfs/${turf.id}/book`}
+            to={bookingUrl}
             className="inline-flex items-center gap-2 text-sm font-medium text-gray-500 transition hover:text-green-600"
           >
             <ArrowLeft size={17} />
@@ -92,7 +254,6 @@ const BookingConfirmation = () => {
         </div>
       </section>
 
-      {/* Main */}
       <section className="mx-auto max-w-6xl px-4 py-10 sm:px-6 lg:px-8">
         <div className="mb-8">
           <div className="inline-flex items-center gap-2 rounded-full bg-green-50 px-3 py-1.5 text-xs font-semibold text-green-700">
@@ -105,20 +266,23 @@ const BookingConfirmation = () => {
           </h1>
 
           <p className="mt-2 text-sm text-gray-500">
-            Review your booking details before proceeding to payment.
+            Review your booking details before proceeding
+            to payment.
           </p>
         </div>
 
         <div className="grid gap-8 lg:grid-cols-[1fr_380px]">
-          {/* Left */}
           <div className="space-y-6">
-            {/* Turf Information */}
             <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white">
               <div className="h-56 overflow-hidden sm:h-64">
                 <img
-                  src={turf.image}
-                  alt={turf.name}
+                  src={turfImage}
+                  alt={turfName}
                   className="h-full w-full object-cover"
+                  onError={(event) => {
+                    event.currentTarget.src =
+                      FALLBACK_IMAGE;
+                  }}
                 />
               </div>
 
@@ -126,21 +290,27 @@ const BookingConfirmation = () => {
                 <div className="flex flex-wrap items-start justify-between gap-4">
                   <div>
                     <span className="inline-flex rounded-full bg-green-50 px-3 py-1 text-xs font-semibold text-green-700">
-                      {turf.sport}
+                      {turfSport}
                     </span>
 
                     <h2 className="mt-3 text-xl font-bold text-gray-900">
-                      {turf.name}
+                      {turfName}
                     </h2>
 
                     <div className="mt-2 flex items-center gap-2 text-sm text-gray-500">
-                      <MapPin size={16} className="text-green-600" />
-                      {turf.location}
+                      <MapPin
+                        size={16}
+                        className="text-green-600"
+                      />
+
+                      {turfLocation}
                     </div>
                   </div>
 
                   <Link
-                    to={`/turfs/${turf.id}`}
+                    to={`/turfs/${encodeURIComponent(
+                      turfId
+                    )}`}
                     className="text-sm font-medium text-green-600 hover:text-green-700"
                   >
                     View turf
@@ -149,21 +319,21 @@ const BookingConfirmation = () => {
               </div>
             </div>
 
-            {/* Booking Details */}
             <div className="rounded-2xl border border-gray-200 bg-white p-6">
               <h2 className="text-lg font-semibold text-gray-900">
                 Booking details
               </h2>
 
               <div className="mt-6 space-y-5">
-                {/* Date */}
                 <div className="flex items-center gap-4">
                   <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-green-50 text-green-600">
                     <CalendarDays size={20} />
                   </div>
 
                   <div>
-                    <p className="text-xs text-gray-400">Booking date</p>
+                    <p className="text-xs text-gray-400">
+                      Booking date
+                    </p>
 
                     <p className="mt-1 text-sm font-semibold text-gray-900">
                       {formattedDate}
@@ -171,14 +341,15 @@ const BookingConfirmation = () => {
                   </div>
                 </div>
 
-                {/* Time */}
                 <div className="flex items-center gap-4">
                   <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-green-50 text-green-600">
                     <Clock size={20} />
                   </div>
 
                   <div>
-                    <p className="text-xs text-gray-400">Selected time</p>
+                    <p className="text-xs text-gray-400">
+                      Selected time
+                    </p>
 
                     <p className="mt-1 text-sm font-semibold text-gray-900">
                       {slot}
@@ -188,10 +359,12 @@ const BookingConfirmation = () => {
               </div>
             </div>
 
-            {/* Important Information */}
             <div className="rounded-2xl border border-green-100 bg-green-50 p-5">
               <div className="flex gap-3">
-                <ShieldCheck size={21} className="shrink-0 text-green-600" />
+                <ShieldCheck
+                  size={21}
+                  className="shrink-0 text-green-600"
+                />
 
                 <div>
                   <h3 className="text-sm font-semibold text-gray-900">
@@ -199,15 +372,15 @@ const BookingConfirmation = () => {
                   </h3>
 
                   <p className="mt-1 text-sm leading-6 text-gray-600">
-                    Your booking will be confirmed after successful payment.
-                    Please arrive on time for your selected slot.
+                    Your booking will be confirmed after
+                    successful payment. Please arrive on
+                    time for your selected slot.
                   </p>
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Right - Price Summary */}
           <aside>
             <div className="sticky top-24 rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
               <h2 className="text-lg font-semibold text-gray-900">
@@ -216,15 +389,19 @@ const BookingConfirmation = () => {
 
               <div className="mt-6 space-y-4 text-sm">
                 <div className="flex items-center justify-between">
-                  <span className="text-gray-500">Turf booking</span>
+                  <span className="text-gray-500">
+                    Turf booking
+                  </span>
 
                   <span className="font-medium text-gray-900">
-                    ৳{turf.price.toLocaleString()}
+                    ৳{turfPrice.toLocaleString("en-BD")}
                   </span>
                 </div>
 
                 <div className="flex items-center justify-between">
-                  <span className="text-gray-500">Service fee</span>
+                  <span className="text-gray-500">
+                    Service fee
+                  </span>
 
                   <span className="font-medium text-gray-900">
                     ৳{serviceFee}
@@ -233,17 +410,19 @@ const BookingConfirmation = () => {
 
                 <div className="border-t border-gray-100 pt-4">
                   <div className="flex items-center justify-between">
-                    <span className="font-semibold text-gray-900">Total</span>
+                    <span className="font-semibold text-gray-900">
+                      Total
+                    </span>
 
                     <span className="text-xl font-bold text-gray-900">
-                      ৳{totalPrice.toLocaleString()}
+                      ৳{totalPrice.toLocaleString("en-BD")}
                     </span>
                   </div>
                 </div>
               </div>
 
               <Link
-                to={`/payment/${turf.id}?date=${date}&slot=${encodeURIComponent(slot)}`}
+                to={paymentUrl}
                 className="mt-7 flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-green-600 text-sm font-semibold text-white transition hover:bg-green-700"
               >
                 <CreditCard size={18} />
@@ -251,7 +430,8 @@ const BookingConfirmation = () => {
               </Link>
 
               <p className="mt-4 text-center text-xs leading-5 text-gray-400">
-                By continuing, you agree to our booking and cancellation policy.
+                By continuing, you agree to our booking and
+                cancellation policy.
               </p>
             </div>
           </aside>

@@ -1,5 +1,9 @@
-import { useState } from "react";
-import { Link, useParams, useSearchParams } from "react-router-dom";
+import { useEffect, useState } from "react";
+import {
+  Link,
+  useParams,
+  useSearchParams,
+} from "react-router-dom";
 import {
   ArrowLeft,
   CalendarDays,
@@ -10,9 +14,16 @@ import {
   Check,
   ShieldCheck,
   LockKeyhole,
+  Loader2,
+  AlertCircle,
 } from "lucide-react";
 
-import { turfs } from "../data/turfs";
+const API_URL = (
+  import.meta.env.VITE_API_URL || "http://localhost:3000"
+).replace(/\/$/, "");
+
+const FALLBACK_IMAGE =
+  "https://placehold.co/1200x800?text=No+Turf+Image";
 
 const paymentMethods = [
   {
@@ -30,7 +41,8 @@ const paymentMethods = [
   {
     id: "card",
     name: "Debit / Credit Card",
-    description: "Visa, Mastercard and other supported cards",
+    description:
+      "Visa, Mastercard and other supported cards",
     icon: CreditCard,
   },
 ];
@@ -42,26 +54,106 @@ const Payment = () => {
   const date = searchParams.get("date");
   const slot = searchParams.get("slot");
 
-  const [selectedMethod, setSelectedMethod] = useState("bkash");
+  const [turf, setTurf] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
-  const turf = turfs.find((item) => item.id === id);
+  const [selectedMethod, setSelectedMethod] =
+    useState("bkash");
+
+  useEffect(() => {
+    const fetchTurf = async () => {
+      const turfId = decodeURIComponent(
+        String(id || "")
+      ).trim();
+
+      if (!turfId) {
+        setError("Invalid turf ID.");
+        setLoading(false);
+        return;
+      }
+
+      try {
+        setLoading(true);
+        setError("");
+
+        const response = await fetch(
+          `${API_URL}/turfs/${encodeURIComponent(turfId)}`
+        );
+
+        const data = await response.json().catch(() => ({}));
+
+        if (!response.ok) {
+          throw new Error(
+            data?.message || "Failed to load turf."
+          );
+        }
+
+        const turfData =
+          data?.turf || data?.data || data;
+
+        if (!turfData || typeof turfData !== "object") {
+          throw new Error("Invalid turf data received.");
+        }
+
+        setTurf(turfData);
+      } catch (error) {
+        console.error(
+          "Failed to load turf:",
+          error
+        );
+
+        setTurf(null);
+        setError(
+          error?.message || "Failed to load turf."
+        );
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchTurf();
+  }, [id]);
+
+  if (loading) {
+    return (
+      <main className="flex min-h-[70vh] items-center justify-center bg-gray-50">
+        <div className="flex items-center gap-3 text-sm text-gray-500">
+          <Loader2
+            size={22}
+            className="animate-spin text-green-600"
+          />
+          Loading payment...
+        </div>
+      </main>
+    );
+  }
 
   if (!turf || !date || !slot) {
     return (
       <main className="flex min-h-[70vh] items-center justify-center bg-gray-50 px-4">
-        <div className="max-w-md rounded-2xl border border-gray-200 bg-white p-8 text-center">
-          <h1 className="text-2xl font-bold text-gray-900">
+        <div className="max-w-md text-center">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-red-50">
+            <AlertCircle
+              size={26}
+              className="text-red-500"
+            />
+          </div>
+
+          <h1 className="mt-5 text-2xl font-bold text-gray-900">
             Payment information missing
           </h1>
 
           <p className="mt-3 text-sm leading-6 text-gray-500">
-            Please complete your booking details before proceeding to payment.
+            {error ||
+              "Please complete your booking details before proceeding to payment."}
           </p>
 
           <Link
             to="/turfs"
-            className="mt-6 inline-flex rounded-xl bg-green-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-green-700"
+            className="mt-6 inline-flex items-center gap-2 rounded-xl bg-green-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-green-700"
           >
+            <ArrowLeft size={17} />
             Back to Turfs
           </Link>
         </div>
@@ -69,18 +161,35 @@ const Payment = () => {
     );
   }
 
-  const formattedDate = new Date(`${date}T00:00:00`).toLocaleDateString(
-    "en-BD",
-    {
-      weekday: "short",
-      day: "numeric",
-      month: "short",
-      year: "numeric",
-    }
+  const turfId = String(
+    turf._id || turf.id || ""
   );
 
+  const turfName = turf.name || "Unnamed Turf";
+
+  const turfImage =
+    typeof turf.image === "string" && turf.image.trim()
+      ? turf.image
+      : FALLBACK_IMAGE;
+
+  const turfLocation =
+    turf.location ||
+    turf.area ||
+    "Dhaka, Bangladesh";
+
+  const turfPrice = Number(turf.price) || 0;
+
+  const formattedDate = new Date(
+    `${date}T00:00:00`
+  ).toLocaleDateString("en-BD", {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+
   const serviceFee = 50;
-  const totalPrice = turf.price + serviceFee;
+  const totalPrice = turfPrice + serviceFee;
 
   const selectedPayment = paymentMethods.find(
     (method) => method.id === selectedMethod
@@ -88,13 +197,14 @@ const Payment = () => {
 
   return (
     <main className="min-h-screen bg-gray-50">
-      {/* Header */}
       <section className="border-b border-gray-200 bg-white">
         <div className="mx-auto max-w-6xl px-4 py-5 sm:px-6 lg:px-8">
           <Link
-            to={`/booking/${turf.id}?date=${date}&slot=${encodeURIComponent(
-              slot
-            )}`}
+            to={`/booking/${encodeURIComponent(
+              turfId
+            )}?date=${encodeURIComponent(
+              date
+            )}&slot=${encodeURIComponent(slot)}`}
             className="inline-flex items-center gap-2 text-sm font-medium text-gray-500 transition hover:text-green-600"
           >
             <ArrowLeft size={17} />
@@ -115,14 +225,13 @@ const Payment = () => {
           </h1>
 
           <p className="mt-2 text-sm text-gray-500">
-            Choose your preferred payment method to confirm your booking.
+            Choose your preferred payment method to confirm
+            your booking.
           </p>
         </div>
 
         <div className="grid gap-8 lg:grid-cols-[1fr_380px]">
-          {/* Left */}
           <div className="space-y-6">
-            {/* Payment Methods */}
             <div className="rounded-2xl border border-gray-200 bg-white p-5 sm:p-6">
               <h2 className="text-lg font-semibold text-gray-900">
                 Payment method
@@ -135,13 +244,16 @@ const Payment = () => {
               <div className="mt-6 space-y-3">
                 {paymentMethods.map((method) => {
                   const Icon = method.icon;
-                  const isSelected = selectedMethod === method.id;
+                  const isSelected =
+                    selectedMethod === method.id;
 
                   return (
                     <button
                       key={method.id}
                       type="button"
-                      onClick={() => setSelectedMethod(method.id)}
+                      onClick={() =>
+                        setSelectedMethod(method.id)
+                      }
                       className={`flex w-full items-center justify-between rounded-xl border p-4 text-left transition ${
                         isSelected
                           ? "border-green-600 bg-green-50"
@@ -177,7 +289,9 @@ const Payment = () => {
                             : "border-gray-300"
                         }`}
                       >
-                        {isSelected && <Check size={13} />}
+                        {isSelected && (
+                          <Check size={13} />
+                        )}
                       </div>
                     </button>
                   );
@@ -185,7 +299,6 @@ const Payment = () => {
               </div>
             </div>
 
-            {/* Payment Information */}
             <div className="rounded-2xl border border-gray-200 bg-white p-5 sm:p-6">
               <h2 className="text-lg font-semibold text-gray-900">
                 Payment details
@@ -204,7 +317,8 @@ const Payment = () => {
                   />
 
                   <p className="mt-2 text-xs text-gray-400">
-                    Enter the mobile number connected to your bKash account.
+                    Enter the mobile number connected to
+                    your bKash account.
                   </p>
                 </div>
               )}
@@ -222,7 +336,8 @@ const Payment = () => {
                   />
 
                   <p className="mt-2 text-xs text-gray-400">
-                    Enter the mobile number connected to your Nagad account.
+                    Enter the mobile number connected to
+                    your Nagad account.
                   </p>
                 </div>
               )}
@@ -270,7 +385,6 @@ const Payment = () => {
               )}
             </div>
 
-            {/* Security */}
             <div className="flex gap-3 rounded-2xl border border-green-100 bg-green-50 p-5">
               <LockKeyhole
                 size={20}
@@ -283,14 +397,13 @@ const Payment = () => {
                 </h3>
 
                 <p className="mt-1 text-sm leading-6 text-gray-600">
-                  This is currently a frontend demonstration. No real payment
-                  will be processed.
+                  This is currently a frontend demonstration.
+                  No real payment will be processed.
                 </p>
               </div>
             </div>
           </div>
 
-          {/* Right Booking Summary */}
           <aside>
             <div className="sticky top-24 rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
               <h2 className="text-lg font-semibold text-gray-900">
@@ -299,20 +412,24 @@ const Payment = () => {
 
               <div className="mt-5 overflow-hidden rounded-xl">
                 <img
-                  src={turf.image}
-                  alt={turf.name}
+                  src={turfImage}
+                  alt={turfName}
                   className="h-36 w-full object-cover"
+                  onError={(event) => {
+                    event.currentTarget.src =
+                      FALLBACK_IMAGE;
+                  }}
                 />
               </div>
 
               <div className="mt-4">
                 <h3 className="font-semibold text-gray-900">
-                  {turf.name}
+                  {turfName}
                 </h3>
 
                 <div className="mt-2 flex items-center gap-2 text-sm text-gray-500">
                   <MapPin size={15} />
-                  {turf.location}
+                  {turfLocation}
                 </div>
               </div>
 
@@ -320,7 +437,10 @@ const Payment = () => {
 
               <div className="space-y-4 text-sm">
                 <div className="flex items-center gap-3">
-                  <CalendarDays size={17} className="text-green-600" />
+                  <CalendarDays
+                    size={17}
+                    className="text-green-600"
+                  />
 
                   <div>
                     <p className="text-xs text-gray-400">
@@ -334,7 +454,10 @@ const Payment = () => {
                 </div>
 
                 <div className="flex items-center gap-3">
-                  <Clock size={17} className="text-green-600" />
+                  <Clock
+                    size={17}
+                    className="text-green-600"
+                  />
 
                   <div>
                     <p className="text-xs text-gray-400">
@@ -357,7 +480,7 @@ const Payment = () => {
                   </span>
 
                   <span className="font-medium text-gray-900">
-                    ৳{turf.price.toLocaleString()}
+                    ৳{turfPrice.toLocaleString("en-BD")}
                   </span>
                 </div>
 
@@ -377,24 +500,30 @@ const Payment = () => {
                   </span>
 
                   <span className="text-xl font-bold text-gray-900">
-                    ৳{totalPrice.toLocaleString()}
+                    ৳{totalPrice.toLocaleString("en-BD")}
                   </span>
                 </div>
               </div>
 
               <Link
-                to={`/booking-success/${turf.id}?date=${date}&slot=${encodeURIComponent(
+                to={`/booking-success/${encodeURIComponent(
+                  turfId
+                )}?date=${encodeURIComponent(
+                  date
+                )}&slot=${encodeURIComponent(
                   slot
-                )}&method=${selectedPayment.id}`}
+                )}&method=${encodeURIComponent(
+                  selectedPayment.id
+                )}`}
                 className="mt-7 flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-green-600 text-sm font-semibold text-white transition hover:bg-green-700"
               >
                 <LockKeyhole size={17} />
-                Pay ৳{totalPrice.toLocaleString()}
+                Pay ৳{totalPrice.toLocaleString("en-BD")}
               </Link>
 
               <p className="mt-4 text-center text-xs leading-5 text-gray-400">
-                By continuing, you agree to our booking and cancellation
-                policy.
+                By continuing, you agree to our booking and
+                cancellation policy.
               </p>
             </div>
           </aside>

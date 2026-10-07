@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   CheckCircle2,
   CalendarDays,
@@ -16,12 +16,7 @@ import {
   useParams,
   useSearchParams,
 } from "react-router-dom";
-import useAuth from "../hooks/useAuth";
-
-const API_URL = (
-  import.meta.env.VITE_API_URL ||
-  "http://localhost:3000"
-).replace(/\/$/, "");
+import { turfs } from "../data/turfs";
 
 const FALLBACK_IMAGE =
   "https://placehold.co/1200x800?text=No+Turf+Image";
@@ -29,305 +24,232 @@ const FALLBACK_IMAGE =
 const BookingSuccess = () => {
   const { id } = useParams();
   const [searchParams] = useSearchParams();
-  const { currentUser } = useAuth();
-
-  const date = searchParams.get("date");
-  const slot = searchParams.get("slot");
-  const method = searchParams.get("method");
 
   const [turf, setTurf] = useState(null);
-  const [booking, setBooking] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [bookingCreating, setBookingCreating] =
-    useState(false);
   const [error, setError] = useState("");
 
+  const date = searchParams.get("date")?.trim() || "";
+  const slot = searchParams.get("slot")?.trim() || "";
+  const method = searchParams.get("method")?.trim().toLowerCase() || "";
+  const bookingId =
+    searchParams.get("bookingId")?.trim() ||
+    searchParams.get("booking")?.trim() ||
+    "";
+
+  const paymentAmount = searchParams.get("amount");
+
   // =========================
-  // FORMAT TIME
+  // FIND TURF FROM LOCAL DATA
   // =========================
 
-  const formatTimeTo24Hour = (time) => {
-    if (!time) return "";
+  useEffect(() => {
+    const findTurf = () => {
+      try {
+        const turfId = decodeURIComponent(
+          String(id || "")
+        ).trim();
 
-    const value = String(time)
-      .trim()
-      .toUpperCase();
+        if (!turfId) {
+          setError("Invalid turf ID.");
+          setLoading(false);
+          return;
+        }
 
-    const match = value.match(
-      /^(\d{1,2}):(\d{2})\s*(AM|PM)?$/
-    );
+        const foundTurf = turfs.find((item) => {
+          const itemId = String(item.id || "").trim();
+          const itemSlug = String(item.slug || "").trim();
 
-    if (!match) {
-      return value;
-    }
+          return (
+            itemId === turfId ||
+            itemSlug === turfId
+          );
+        });
 
-    let hours = Number(match[1]);
-    const minutes = match[2];
-    const period = match[3];
+        if (!foundTurf) {
+          setError("Turf not found.");
+          setLoading(false);
+          return;
+        }
 
-    if (period === "AM") {
-      if (hours === 12) {
-        hours = 0;
+        setTurf(foundTurf);
+        setLoading(false);
+      } catch (err) {
+        console.error("Turf loading error:", err);
+
+        setError("Failed to load turf information.");
+        setLoading(false);
       }
-    }
+    };
 
-    if (period === "PM") {
-      if (hours !== 12) {
-        hours += 12;
-      }
-    }
-
-    return `${String(hours).padStart(
-      2,
-      "0"
-    )}:${minutes}`;
-  };
+    findTurf();
+  }, [id]);
 
   // =========================
   // PARSE SLOT
   // =========================
 
-  const parseSlot = (slotValue) => {
-    if (!slotValue) {
+  const parsedSlot = useMemo(() => {
+    if (!slot) {
       return {
         startTime: "",
         endTime: "",
       };
     }
 
-    const parts = String(slotValue)
+    const parts = String(slot)
       .split(/\s*(?:-|–|—|to)\s*/i)
       .map((item) => item.trim())
       .filter(Boolean);
 
-    if (parts.length < 2) {
-      return {
-        startTime: "",
-        endTime: "",
-      };
+    return {
+      startTime: parts[0] || "",
+      endTime: parts[1] || "",
+    };
+  }, [slot]);
+
+  // =========================
+  // FORMAT DATE
+  // =========================
+
+  const formattedDate = useMemo(() => {
+    if (!date) {
+      return "Not available";
     }
 
-    return {
-      startTime: formatTimeTo24Hour(parts[0]),
-      endTime: formatTimeTo24Hour(parts[1]),
-    };
-  };
+    const parsedDate = new Date(`${date}T00:00:00`);
+
+    if (Number.isNaN(parsedDate.getTime())) {
+      return date;
+    }
+
+    return parsedDate.toLocaleDateString("en-BD", {
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+    });
+  }, [date]);
 
   // =========================
-  // FETCH TURF + CREATE BOOKING
+  // PAYMENT METHOD
   // =========================
 
-  useEffect(() => {
-    let cancelled = false;
+  const paymentMethod = useMemo(() => {
+    switch (method) {
+      case "bkash":
+        return "bKash";
 
-    const createBooking = async () => {
-      const turfId = decodeURIComponent(
-        String(id || "")
-      ).trim();
+      case "nagad":
+        return "Nagad";
 
-      if (!turfId) {
-        setError("Invalid turf ID.");
-        setLoading(false);
-        return;
-      }
+      case "card":
+        return "Card Payment";
 
-      if (!currentUser?.email) {
-        setError(
-          "You must be logged in to create a booking."
-        );
-        setLoading(false);
-        return;
-      }
+      case "online":
+        return "Online Payment";
 
-      if (!date) {
-        setError(
-          "Booking date is missing."
-        );
-        setLoading(false);
-        return;
-      }
+      default:
+        return method
+          ? method.charAt(0).toUpperCase() + method.slice(1)
+          : "Online Payment";
+    }
+  }, [method]);
 
-      const { startTime, endTime } =
-        parseSlot(slot);
+  // =========================
+  // TURF DATA
+  // =========================
 
-      if (!startTime || !endTime) {
-        setError(
-          "Booking time slot is missing or invalid."
-        );
-        setLoading(false);
-        return;
-      }
+  const turfName = String(
+    turf?.name || "Unnamed Turf"
+  ).trim();
 
-      try {
-        setLoading(true);
-        setError("");
+  const turfImage =
+    typeof turf?.image === "string" &&
+    turf.image.trim()
+      ? turf.image.trim()
+      : FALLBACK_IMAGE;
 
-        // =========================
-        // 1. GET TURF
-        // =========================
+  const turfSport = String(
+    turf?.sport || "Sports Turf"
+  ).trim();
 
-        const turfResponse = await fetch(
-          `${API_URL}/turfs/${encodeURIComponent(
-            turfId
-          )}`
-        );
+  const turfLocation = String(
+    turf?.location ||
+      turf?.area ||
+      "Dhaka, Bangladesh"
+  ).trim();
 
-        const turfData =
-          await turfResponse
-            .json()
-            .catch(() => ({}));
+  // =========================
+  // PRICE
+  // =========================
 
-        if (!turfResponse.ok) {
-          throw new Error(
-            turfData?.message ||
-              "Failed to load turf information."
-          );
-        }
+  const safePrice = useMemo(() => {
+    const urlAmount = Number(paymentAmount);
 
-        const turfInfo =
-          turfData?.turf ||
-          turfData?.data ||
-          turfData;
+    if (
+      Number.isFinite(urlAmount) &&
+      urlAmount >= 0
+    ) {
+      return urlAmount;
+    }
 
-        if (
-          !turfInfo ||
-          typeof turfInfo !== "object"
-        ) {
-          throw new Error(
-            "Invalid turf data received from server."
-          );
-        }
+    const turfPrice = Number(turf?.price);
 
-        if (cancelled) return;
+    if (
+      Number.isFinite(turfPrice) &&
+      turfPrice >= 0
+    ) {
+      return turfPrice;
+    }
 
-        setTurf(turfInfo);
+    return 0;
+  }, [paymentAmount, turf?.price]);
 
-        // =========================
-        // 2. CREATE BOOKING
-        // =========================
+  // =========================
+  // BOOKING REFERENCE
+  // =========================
 
-        setBookingCreating(true);
+  const bookingReference = useMemo(() => {
+    if (bookingId) {
+      return `KHL-${String(bookingId)
+        .slice(-8)
+        .toUpperCase()}`;
+    }
 
-        const userEmail = currentUser.email
-          .trim()
-          .toLowerCase();
+    const fallbackId =
+      turf?.id ||
+      id ||
+      "BOOKING";
 
-        const bookingPayload = {
-          turfId:
-            turfInfo._id ||
-            turfInfo.id ||
-            turfId,
+    return `KHL-${String(fallbackId)
+      .replace(/[^a-zA-Z0-9]/g, "")
+      .slice(-8)
+      .toUpperCase()}`;
+  }, [bookingId, turf?.id, id]);
 
-          userEmail,
+  // =========================
+  // VALIDATE BOOKING INFO
+  // =========================
 
-          userName:
-            currentUser.displayName ||
-            currentUser.name ||
-            "",
+  const missingInformation = useMemo(() => {
+    const missing = [];
 
-          userPhone:
-            currentUser.phone ||
-            "",
+    if (!date) {
+      missing.push("booking date");
+    }
 
-          date,
+    if (!slot) {
+      missing.push("time slot");
+    }
 
-          startTime,
-
-          endTime,
-
-          paymentMethod:
-            method || "online",
-
-          paymentStatus: "paid",
-
-          status: "confirmed",
-        };
-
-        console.log(
-          "Creating booking:",
-          bookingPayload
-        );
-
-        const bookingResponse =
-          await fetch(
-            `${API_URL}/bookings`,
-            {
-              method: "POST",
-
-              headers: {
-                "Content-Type":
-                  "application/json",
-              },
-
-              body: JSON.stringify(
-                bookingPayload
-              ),
-            }
-          );
-
-        const bookingData =
-          await bookingResponse
-            .json()
-            .catch(() => ({}));
-
-        if (!bookingResponse.ok) {
-          throw new Error(
-            bookingData?.message ||
-              "Failed to create booking."
-          );
-        }
-
-        if (
-          !bookingData?.booking
-        ) {
-          throw new Error(
-            "Booking was created but no booking data was returned."
-          );
-        }
-
-        if (cancelled) return;
-
-        setBooking(
-          bookingData.booking
-        );
-      } catch (error) {
-        console.error(
-          "Booking creation error:",
-          error
-        );
-
-        if (!cancelled) {
-          setError(
-            error?.message ||
-              "Failed to create booking."
-          );
-        }
-      } finally {
-        if (!cancelled) {
-          setBookingCreating(false);
-          setLoading(false);
-        }
-      }
-    };
-
-    createBooking();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [
-    id,
-    date,
-    slot,
-    method,
-    currentUser?.email,
-  ]);
+    return missing;
+  }, [date, slot]);
 
   // =========================
   // LOADING
   // =========================
 
-  if (loading || bookingCreating) {
+  if (loading) {
     return (
       <main className="flex min-h-[70vh] items-center justify-center bg-gray-50 px-4">
         <div className="text-center">
@@ -337,13 +259,11 @@ const BookingSuccess = () => {
           />
 
           <h1 className="mt-4 text-xl font-semibold text-gray-900">
-            {bookingCreating
-              ? "Confirming your booking..."
-              : "Loading booking..."}
+            Loading booking...
           </h1>
 
           <p className="mt-2 text-sm text-gray-500">
-            Please wait while we save your booking.
+            Please wait while we load your booking information.
           </p>
         </div>
       </main>
@@ -354,7 +274,7 @@ const BookingSuccess = () => {
   // ERROR
   // =========================
 
-  if (error || !turf || !booking) {
+  if (error || !turf) {
     return (
       <main className="flex min-h-[70vh] items-center justify-center bg-gray-50 px-4">
         <div className="max-w-md text-center">
@@ -366,12 +286,11 @@ const BookingSuccess = () => {
           </div>
 
           <h1 className="mt-5 text-2xl font-bold text-gray-900">
-            Booking could not be completed
+            Booking information unavailable
           </h1>
 
           <p className="mt-3 text-sm leading-6 text-gray-500">
-            {error ||
-              "We could not create your booking."}
+            {error || "Turf information could not be loaded."}
           </p>
 
           <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-center">
@@ -396,81 +315,58 @@ const BookingSuccess = () => {
   }
 
   // =========================
-  // TURF DATA
+  // MISSING PAYMENT INFO
   // =========================
 
-  const turfName = String(
-    turf.name || "Unnamed Turf"
-  ).trim();
+  if (missingInformation.length > 0) {
+    return (
+      <main className="flex min-h-[70vh] items-center justify-center bg-gray-50 px-4">
+        <div className="max-w-md text-center">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-amber-50">
+            <AlertCircle
+              size={26}
+              className="text-amber-500"
+            />
+          </div>
 
-  const turfImage =
-    typeof turf.image === "string" &&
-    turf.image.trim()
-      ? turf.image.trim()
-      : FALLBACK_IMAGE;
+          <h1 className="mt-5 text-2xl font-bold text-gray-900">
+            Payment information missing
+          </h1>
 
-  const turfSport = String(
-    turf.sport || "Sports Turf"
-  ).trim();
+          <p className="mt-3 text-sm leading-6 text-gray-500">
+            Some booking information was not passed to
+            the payment success page.
+          </p>
 
-  const turfLocation = String(
-    turf.location ||
-      turf.area ||
-      "Dhaka, Bangladesh"
-  ).trim();
+          <p className="mt-2 text-sm text-gray-500">
+            Missing: {missingInformation.join(", ")}.
+          </p>
 
-  const turfPrice = Number(
-    booking.price ?? turf.price
-  );
+          <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-center">
+            <Link
+              to={`/turfs/${turf.id}`}
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-green-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-green-700"
+            >
+              Back to Turf
+              <ArrowRight size={17} />
+            </Link>
 
-  const safePrice =
-    Number.isFinite(turfPrice) &&
-    turfPrice >= 0
-      ? turfPrice
-      : 0;
-
-  const formattedDate = date
-    ? new Date(
-        `${date}T00:00:00`
-      ).toLocaleDateString(
-        "en-BD",
-        {
-          day: "numeric",
-          month: "long",
-          year: "numeric",
-        }
-      )
-    : "Not selected";
-
-  const paymentMethod =
-    method === "bkash"
-      ? "bKash"
-      : method === "nagad"
-        ? "Nagad"
-        : method === "card"
-          ? "Card Payment"
-          : "Online Payment";
-
-  // =========================
-  // BOOKING REFERENCE
-  // =========================
-
-  const bookingId =
-    booking._id ||
-    booking.id ||
-    booking.bookingId ||
-    "";
-
-  const bookingReference = bookingId
-    ? `KHL-${String(bookingId)
-        .slice(-8)
-        .toUpperCase()}`
-    : "KHL-BOOKING";
+            <Link
+              to="/turfs"
+              className="inline-flex items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-5 py-3 text-sm font-semibold text-gray-700 transition hover:border-green-500 hover:text-green-600"
+            >
+              Explore Turfs
+            </Link>
+          </div>
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main className="min-h-screen bg-gray-50 px-4 py-10 sm:px-6 lg:px-8">
       <div className="mx-auto max-w-3xl">
-        {/* SUCCESS */}
+        {/* SUCCESS HEADER */}
         <div className="rounded-2xl border border-green-100 bg-white p-6 text-center shadow-sm sm:p-10">
           <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-green-50">
             <CheckCircle2
@@ -488,13 +384,14 @@ const BookingSuccess = () => {
           </h1>
 
           <p className="mx-auto mt-4 max-w-lg text-sm leading-6 text-gray-500 sm:text-base">
-            Your booking has been successfully
-            saved. Get ready for your game!
+            Your payment was successful and your booking
+            information has been confirmed.
           </p>
         </div>
 
         {/* TURF + BOOKING */}
         <div className="mt-6 overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
+          {/* TURF */}
           <div className="flex flex-col gap-5 p-5 sm:flex-row sm:items-center sm:p-6">
             <img
               src={turfImage}
@@ -521,19 +418,21 @@ const BookingSuccess = () => {
                   className="text-green-600"
                 />
 
-                {turfLocation}
+                <span>{turfLocation}</span>
               </div>
             </div>
           </div>
 
           <div className="h-px bg-gray-100" />
 
+          {/* BOOKING DETAILS */}
           <div className="p-5 sm:p-6">
             <h3 className="flex items-center gap-2 font-semibold text-gray-900">
               <ReceiptText
                 size={19}
                 className="text-green-600"
               />
+
               Booking Details
             </h3>
 
@@ -541,7 +440,7 @@ const BookingSuccess = () => {
               {/* DATE */}
               <div className="rounded-xl bg-gray-50 p-4">
                 <div className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-white text-green-600 shadow-sm">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white text-green-600 shadow-sm">
                     <CalendarDays size={19} />
                   </div>
 
@@ -560,7 +459,7 @@ const BookingSuccess = () => {
               {/* TIME */}
               <div className="rounded-xl bg-gray-50 p-4">
                 <div className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-white text-green-600 shadow-sm">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white text-green-600 shadow-sm">
                     <Clock size={19} />
                   </div>
 
@@ -570,17 +469,24 @@ const BookingSuccess = () => {
                     </p>
 
                     <p className="mt-1 text-sm font-semibold text-gray-900">
-                      {slot ||
-                        `${booking.startTime} - ${booking.endTime}`}
+                      {slot}
                     </p>
+
+                    {parsedSlot.startTime &&
+                      parsedSlot.endTime && (
+                        <p className="mt-1 text-xs text-gray-400">
+                          {parsedSlot.startTime} -{" "}
+                          {parsedSlot.endTime}
+                        </p>
+                      )}
                   </div>
                 </div>
               </div>
 
-              {/* PAYMENT */}
+              {/* PAYMENT METHOD */}
               <div className="rounded-xl bg-gray-50 p-4">
                 <div className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-white text-green-600 shadow-sm">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white text-green-600 shadow-sm">
                     <CreditCard size={19} />
                   </div>
 
@@ -596,7 +502,7 @@ const BookingSuccess = () => {
                 </div>
               </div>
 
-              {/* PRICE */}
+              {/* TOTAL */}
               <div className="rounded-xl bg-green-50 p-4">
                 <p className="text-xs text-green-700">
                   Total Paid
@@ -604,13 +510,11 @@ const BookingSuccess = () => {
 
                 <p className="mt-2 text-2xl font-bold text-green-700">
                   ৳
-                  {safePrice.toLocaleString(
-                    "en-BD"
-                  )}
+                  {safePrice.toLocaleString("en-BD")}
                 </p>
 
                 <p className="mt-1 text-xs text-green-600">
-                  Booking payment successful
+                  Payment completed successfully
                 </p>
               </div>
             </div>
@@ -650,8 +554,8 @@ const BookingSuccess = () => {
         </div>
 
         <p className="mt-6 text-center text-xs leading-5 text-gray-400">
-          Your booking has been saved successfully
-          to your Khelaro account.
+          Your booking information has been saved to
+          your Khelaro account.
         </p>
       </div>
     </main>

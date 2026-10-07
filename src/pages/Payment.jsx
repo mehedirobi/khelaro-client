@@ -17,8 +17,10 @@ import {
   LockKeyhole,
   Loader2,
   AlertCircle,
+  RefreshCw,
 } from "lucide-react";
 import useAuth from "../hooks/useAuth";
+import { turfs } from "../data/turfs";
 
 const API_URL = (
   import.meta.env.VITE_API_URL || "http://localhost:3000"
@@ -53,17 +55,33 @@ const convertToMinutes = (time) => {
 
   const value = String(time).trim().toUpperCase();
 
-  const match = value.match(
+  const match24 = value.match(
+    /^([01]\d|2[0-3]):([0-5]\d)$/
+  );
+
+  if (match24) {
+    return (
+      Number(match24[1]) * 60 +
+      Number(match24[2])
+    );
+  }
+
+  const match12 = value.match(
     /^(\d{1,2}):(\d{2})\s*(AM|PM)$/
   );
 
-  if (!match) return -1;
+  if (!match12) return -1;
 
-  let hours = Number(match[1]);
-  const minutes = Number(match[2]);
-  const period = match[3];
+  let hours = Number(match12[1]);
+  const minutes = Number(match12[2]);
+  const period = match12[3];
 
-  if (hours < 1 || hours > 12 || minutes < 0 || minutes > 59) {
+  if (
+    hours < 1 ||
+    hours > 12 ||
+    minutes < 0 ||
+    minutes > 59
+  ) {
     return -1;
   }
 
@@ -78,17 +96,30 @@ const convertToMinutes = (time) => {
   return hours * 60 + minutes;
 };
 
-const getNextTime = (time) => {
-  const totalMinutes = convertToMinutes(time);
-
-  if (totalMinutes < 0) {
+const format24HourTime = (totalMinutes) => {
+  if (
+    !Number.isFinite(totalMinutes) ||
+    totalMinutes < 0 ||
+    totalMinutes >= 24 * 60
+  ) {
     return "";
   }
 
-  const nextMinutes = totalMinutes + 60;
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
 
-  const hours24 = Math.floor(nextMinutes / 60) % 24;
-  const minutes = nextMinutes % 60;
+  return `${String(hours).padStart(2, "0")}:${String(
+    minutes
+  ).padStart(2, "0")}`;
+};
+
+const formatDisplayTime = (time) => {
+  const totalMinutes = convertToMinutes(time);
+
+  if (totalMinutes < 0) return "";
+
+  const hours24 = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
 
   const period = hours24 >= 12 ? "PM" : "AM";
   const hours12 = hours24 % 12 || 12;
@@ -99,23 +130,45 @@ const getNextTime = (time) => {
 };
 
 const normalizeTime = (time) => {
-  if (!time) return "";
+  const totalMinutes = convertToMinutes(time);
 
-  const value = String(time).trim().toUpperCase();
-
-  const match = value.match(
-    /^(\d{1,2}):(\d{2})\s*(AM|PM)$/
-  );
-
-  if (!match) {
-    return value;
+  if (totalMinutes < 0) {
+    return "";
   }
 
-  const hours = Number(match[1]) % 12 || 12;
-  const minutes = match[2];
-  const period = match[3];
+  return format24HourTime(totalMinutes);
+};
 
-  return `${String(hours).padStart(2, "0")}:${minutes} ${period}`;
+const getNextTime = (time) => {
+  const totalMinutes = convertToMinutes(time);
+
+  if (totalMinutes < 0) {
+    return "";
+  }
+
+  const nextMinutes = totalMinutes + 60;
+
+  if (nextMinutes >= 24 * 60) {
+    return "";
+  }
+
+  return format24HourTime(nextMinutes);
+};
+
+const getBookingList = (data) => {
+  if (Array.isArray(data)) {
+    return data;
+  }
+
+  if (Array.isArray(data?.bookings)) {
+    return data.bookings;
+  }
+
+  if (Array.isArray(data?.data)) {
+    return data.data;
+  }
+
+  return [];
 };
 
 const Payment = () => {
@@ -126,99 +179,66 @@ const Payment = () => {
   const date = searchParams.get("date");
   const slot = searchParams.get("slot");
 
-  const { currentUser, loading: authLoading } = useAuth();
+  const { currentUser, loading: authLoading } =
+    useAuth();
 
   const [turf, setTurf] = useState(null);
+
   const [loading, setLoading] = useState(true);
   const [paying, setPaying] = useState(false);
 
   const [error, setError] = useState("");
-  const [paymentError, setPaymentError] = useState("");
+  const [paymentError, setPaymentError] =
+    useState("");
 
-  const [selectedMethod, setSelectedMethod] = useState("bkash");
+  const [selectedMethod, setSelectedMethod] =
+    useState("bkash");
 
-  const [accountNumber, setAccountNumber] = useState("");
-  const [cardNumber, setCardNumber] = useState("");
+  const [accountNumber, setAccountNumber] =
+    useState("");
+
+  const [cardNumber, setCardNumber] =
+    useState("");
+
   const [expiry, setExpiry] = useState("");
   const [cvv, setCvv] = useState("");
 
   useEffect(() => {
-    const controller = new AbortController();
+    const turfIdentifier = decodeURIComponent(
+      String(id || "")
+    ).trim();
 
-    const fetchTurf = async () => {
-      const turfId = decodeURIComponent(
-        String(id || "")
+    if (!turfIdentifier) {
+      setError("Invalid turf ID.");
+      setLoading(false);
+      return;
+    }
+
+    const foundTurf = turfs.find((item) => {
+      const itemId = String(
+        item?.id || ""
       ).trim();
 
-      if (!turfId) {
-        setError("Invalid turf ID.");
-        setLoading(false);
-        return;
-      }
+      const itemSlug = String(
+        item?.slug || ""
+      ).trim();
 
-      try {
-        setLoading(true);
-        setError("");
+      return (
+        itemId === turfIdentifier ||
+        itemSlug === turfIdentifier
+      );
+    });
 
-        const response = await fetch(
-          `${API_URL}/turfs/${encodeURIComponent(turfId)}`,
-          {
-            method: "GET",
-            signal: controller.signal,
-          }
-        );
+    if (!foundTurf) {
+      setError("Turf not found.");
+      setTurf(null);
+      setLoading(false);
+      return;
+    }
 
-        const data = await response.json().catch(() => ({}));
-
-        if (!response.ok) {
-          throw new Error(
-            data?.message || "Failed to load turf."
-          );
-        }
-
-        const turfData =
-          data?.turf ||
-          data?.data ||
-          data;
-
-        if (
-          !turfData ||
-          typeof turfData !== "object" ||
-          Array.isArray(turfData)
-        ) {
-          throw new Error(
-            "Invalid turf data received."
-          );
-        }
-
-        setTurf(turfData);
-      } catch (err) {
-        if (err.name === "AbortError") {
-          return;
-        }
-
-        console.error(
-          "Failed to load turf:",
-          err
-        );
-
-        setTurf(null);
-        setError(
-          err?.message ||
-            "Failed to load turf."
-        );
-      } finally {
-        if (!controller.signal.aborted) {
-          setLoading(false);
-        }
-      }
-    };
-
-    fetchTurf();
-
-    return () => {
-      controller.abort();
-    };
+    setTurf(foundTurf);
+    setError("");
+    setLoading(false);
   }, [id]);
 
   const validatePaymentDetails = () => {
@@ -254,10 +274,97 @@ const Payment = () => {
     return "";
   };
 
+  const checkAvailability = async ({
+    turfId,
+    selectedDate,
+  }) => {
+    const url =
+      `${API_URL}/bookings/availability` +
+      `?turfId=${encodeURIComponent(turfId)}` +
+      `&date=${encodeURIComponent(selectedDate)}`;
+
+    const response = await fetch(url, {
+      method: "GET",
+    });
+
+    const data = await response
+      .json()
+      .catch(() => ({}));
+
+    if (!response.ok) {
+      throw new Error(
+        data?.message ||
+          "Could not check slot availability."
+      );
+    }
+
+    return getBookingList(data);
+  };
+
+  const isSlotAlreadyBooked = (
+    bookingList,
+    startTime,
+    endTime
+  ) => {
+    const requestedStart =
+      convertToMinutes(startTime);
+
+    const requestedEnd =
+      convertToMinutes(endTime);
+
+    if (
+      requestedStart < 0 ||
+      requestedEnd < 0
+    ) {
+      return false;
+    }
+
+    return bookingList.some((booking) => {
+      const status = String(
+        booking?.status || ""
+      ).toLowerCase();
+
+      if (
+        status !== "pending" &&
+        status !== "confirmed"
+      ) {
+        return false;
+      }
+
+      const bookingStart =
+        convertToMinutes(
+          booking?.startTime ||
+            booking?.start ||
+            ""
+        );
+
+      const bookingEnd =
+        convertToMinutes(
+          booking?.endTime ||
+            booking?.end ||
+            ""
+        );
+
+      if (
+        bookingStart < 0 ||
+        bookingEnd < 0
+      ) {
+        return false;
+      }
+
+      return (
+        requestedStart < bookingEnd &&
+        requestedEnd > bookingStart
+      );
+    });
+  };
+
   const handlePayment = async () => {
     if (paying) {
       return;
     }
+
+    setPaymentError("");
 
     if (authLoading) {
       setPaymentError(
@@ -295,22 +402,34 @@ const Payment = () => {
     const startTime = normalizeTime(slot);
     const endTime = getNextTime(startTime);
 
-    if (
-      !startTime ||
-      !endTime ||
-      convertToMinutes(startTime) < 0 ||
-      convertToMinutes(endTime) < 0
-    ) {
+    if (!startTime || !endTime) {
       setPaymentError(
         "Invalid booking time slot. Please go back and select the time again."
       );
       return;
     }
 
+    const startMinutes =
+      convertToMinutes(startTime);
+
+    const endMinutes =
+      convertToMinutes(endTime);
+
+    if (
+      startMinutes < 0 ||
+      endMinutes < 0 ||
+      endMinutes <= startMinutes
+    ) {
+      setPaymentError(
+        "Invalid booking time slot."
+      );
+      return;
+    }
+
     const turfId = String(
-      turf?._id ||
-        turf?.id ||
+      turf?.id ||
         turf?.turfId ||
+        turf?._id ||
         id ||
         ""
     ).trim();
@@ -322,9 +441,52 @@ const Payment = () => {
       return;
     }
 
+    const turfName = String(
+      turf?.name || "Unnamed Turf"
+    ).trim();
+
+    const turfLocation = String(
+      turf?.location ||
+        turf?.area ||
+        "Dhaka, Bangladesh"
+    ).trim();
+
+    const turfImage =
+      typeof turf?.image === "string"
+        ? turf.image.trim()
+        : "";
+
     try {
       setPaying(true);
-      setPaymentError("");
+
+      /*
+       * Check availability one more time
+       * before creating the booking.
+       */
+      const bookingList =
+        await checkAvailability({
+          turfId,
+          selectedDate: date,
+        });
+
+      const alreadyBooked =
+        isSlotAlreadyBooked(
+          bookingList,
+          startTime,
+          endTime
+        );
+
+      if (alreadyBooked) {
+        setPaymentError(
+          `This slot is no longer available. ${formatDisplayTime(
+            startTime
+          )} - ${formatDisplayTime(
+            endTime
+          )} is already booked. Please go back and choose another slot.`
+        );
+
+        return;
+      }
 
       const response = await fetch(
         `${API_URL}/bookings`,
@@ -335,13 +497,25 @@ const Payment = () => {
           },
           body: JSON.stringify({
             turfId,
+            turfName,
+            turfLocation,
+            turfImage,
+
             userEmail,
+
+            userName:
+              currentUser?.displayName ||
+              currentUser?.name ||
+              "",
 
             date,
             startTime,
             endTime,
 
+            price: Number(turf?.price) || 0,
+
             paymentMethod: selectedMethod,
+
             paymentStatus: "paid",
           }),
         }
@@ -352,15 +526,33 @@ const Payment = () => {
         .catch(() => ({}));
 
       if (!response.ok) {
-        throw new Error(
+        const serverMessage = String(
           data?.message ||
+            data?.error ||
             "Failed to create booking."
         );
+
+        if (
+          response.status === 409 ||
+          serverMessage
+            .toLowerCase()
+            .includes("already booked") ||
+          serverMessage
+            .toLowerCase()
+            .includes("already booking")
+        ) {
+          throw new Error(
+            `This slot was just booked by another user. Please choose another time slot.`
+          );
+        }
+
+        throw new Error(serverMessage);
       }
 
       const booking =
         data?.booking ||
-        data?.data;
+        data?.data ||
+        data?.result;
 
       if (
         !booking ||
@@ -372,9 +564,9 @@ const Payment = () => {
       }
 
       const bookingId = String(
-        booking._id ||
-          booking.id ||
-          booking.bookingId ||
+        booking?._id ||
+          booking?.id ||
+          booking?.bookingId ||
           ""
       ).trim();
 
@@ -384,13 +576,19 @@ const Payment = () => {
         );
       }
 
+      const displayStartTime =
+        formatDisplayTime(startTime);
+
+      const displayEndTime =
+        formatDisplayTime(endTime);
+
       navigate(
         `/booking-success/${encodeURIComponent(
           turfId
         )}?date=${encodeURIComponent(
           date
         )}&slot=${encodeURIComponent(
-          `${startTime} - ${endTime}`
+          `${displayStartTime} - ${displayEndTime}`
         )}&method=${encodeURIComponent(
           selectedMethod
         )}&bookingId=${encodeURIComponent(
@@ -465,30 +663,30 @@ const Payment = () => {
   }
 
   const turfId = String(
-    turf._id ||
-      turf.id ||
-      turf.turfId ||
+    turf?.id ||
+      turf?.turfId ||
+      turf?._id ||
       id ||
       ""
   ).trim();
 
   const turfName = String(
-    turf.name || "Unnamed Turf"
+    turf?.name || "Unnamed Turf"
   ).trim();
 
   const turfImage =
-    typeof turf.image === "string" &&
+    typeof turf?.image === "string" &&
     turf.image.trim()
       ? turf.image.trim()
       : FALLBACK_IMAGE;
 
   const turfLocation = String(
-    turf.location ||
-      turf.area ||
+    turf?.location ||
+      turf?.area ||
       "Dhaka, Bangladesh"
   ).trim();
 
-  const turfPriceValue = Number(turf.price);
+  const turfPriceValue = Number(turf?.price);
 
   const turfPrice =
     Number.isFinite(turfPriceValue) &&
@@ -498,15 +696,12 @@ const Payment = () => {
 
   const formattedDate = new Date(
     `${date}T00:00:00`
-  ).toLocaleDateString(
-    "en-BD",
-    {
-      weekday: "short",
-      day: "numeric",
-      month: "short",
-      year: "numeric",
-    }
-  );
+  ).toLocaleDateString("en-BD", {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
 
   const normalizedStartTime =
     normalizeTime(slot);
@@ -515,11 +710,17 @@ const Payment = () => {
     getNextTime(normalizedStartTime);
 
   const displaySlot =
-    normalizedStartTime && normalizedEndTime
-      ? `${normalizedStartTime} - ${normalizedEndTime}`
+    normalizedStartTime &&
+    normalizedEndTime
+      ? `${formatDisplayTime(
+          normalizedStartTime
+        )} - ${formatDisplayTime(
+          normalizedEndTime
+        )}`
       : slot;
 
   const serviceFee = 50;
+
   const totalPrice =
     turfPrice + serviceFee;
 
@@ -574,8 +775,7 @@ const Payment = () => {
               <div className="mt-6 space-y-3">
                 {paymentMethods.map(
                   (method) => {
-                    const Icon =
-                      method.icon;
+                    const Icon = method.icon;
 
                     const isSelected =
                       selectedMethod ===
@@ -590,6 +790,7 @@ const Payment = () => {
                           setSelectedMethod(
                             method.id
                           );
+
                           setPaymentError("");
                           setAccountNumber("");
                           setCardNumber("");
@@ -813,14 +1014,30 @@ const Payment = () => {
                   className="shrink-0 text-red-500"
                 />
 
-                <div>
+                <div className="min-w-0">
                   <h3 className="text-sm font-semibold text-red-800">
-                    Payment failed
+                    Booking could not be completed
                   </h3>
 
                   <p className="mt-1 text-sm leading-6 text-red-600">
                     {paymentError}
                   </p>
+
+                  {paymentError
+                    .toLowerCase()
+                    .includes("booked") && (
+                    <Link
+                      to={`/booking/${encodeURIComponent(
+                        turfId
+                      )}?date=${encodeURIComponent(
+                        date
+                      )}`}
+                      className="mt-3 inline-flex items-center gap-1.5 text-xs font-semibold text-red-700 hover:text-red-800"
+                    >
+                      <RefreshCw size={13} />
+                      Choose another slot
+                    </Link>
+                  )}
                 </div>
               </div>
             )}
@@ -958,7 +1175,9 @@ const Payment = () => {
 
               <button
                 type="button"
-                disabled={paying || authLoading}
+                disabled={
+                  paying || authLoading
+                }
                 onClick={handlePayment}
                 className="mt-7 flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-green-600 text-sm font-semibold text-white transition hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-60"
               >

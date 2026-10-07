@@ -47,6 +47,9 @@ import AdminBookings from "../dashboard/AdminBookings";
 import AdminRevenue from "../dashboard/AdminRevenue";
 import AdminProfile from "../dashboard/AdminProfile";
 
+
+import BookingDetails from "../dashboard/BookingDetails";
+
 const router = createBrowserRouter([
   // ========================================
   // MAIN WEBSITE
@@ -93,6 +96,10 @@ const router = createBrowserRouter([
             <BookingSection />
           </PrivateRoute>
         ),
+      },
+      {
+        path: "/dashboard/bookings/:id",
+        element: <BookingDetails />
       },
 
       {

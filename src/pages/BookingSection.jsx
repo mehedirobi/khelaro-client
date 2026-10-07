@@ -11,7 +11,9 @@ import {
   Star,
   Loader2,
   RefreshCw,
+  ChevronDown,
 } from "lucide-react";
+import { turfs } from "../data/turfs";
 
 const API_URL = (
   import.meta.env.VITE_API_URL || "http://localhost:3000"
@@ -38,24 +40,86 @@ const TIME_SLOTS = [
   "10:00 PM",
 ];
 
+const MONTHS = [
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
+];
+
+const getTodayDate = () => {
+  const now = new Date();
+
+  return {
+    year: now.getFullYear(),
+    month: now.getMonth() + 1,
+    day: now.getDate(),
+  };
+};
+
+const getTodayString = () => {
+  const { year, month, day } = getTodayDate();
+
+  return `${year}-${String(month).padStart(2, "0")}-${String(
+    day
+  ).padStart(2, "0")}`;
+};
+
 const formatDate = (date) => {
   if (!date) return "";
 
-  const parsedDate = new Date(`${date}T00:00:00`);
+  const match = String(date).match(
+    /^(\d{4})-(\d{2})-(\d{2})$/
+  );
 
-  if (Number.isNaN(parsedDate.getTime())) {
-    return date;
+  if (!match) return date;
+
+  const [, year, month, day] = match;
+
+  return `${day}-${month}-${year}`;
+};
+
+const buildDateString = (year, month, day) => {
+  if (!year || !month || !day) {
+    return "";
   }
 
-  return parsedDate.toLocaleDateString("en-BD", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
+  return `${String(year)}-${String(month).padStart(
+    2,
+    "0"
+  )}-${String(day).padStart(2, "0")}`;
+};
+
+const getDaysInMonth = (year, month) => {
+  if (!year || !month) {
+    return 31;
+  }
+
+  return new Date(
+    Number(year),
+    Number(month),
+    0
+  ).getDate();
+};
+
+const isDateBeforeToday = (dateString) => {
+  if (!dateString) return false;
+
+  return dateString < getTodayString();
 };
 
 const convertToMinutes = (time) => {
-  if (!time) return -1;
+  if (!time) {
+    return -1;
+  }
 
   const value = String(time).trim().toUpperCase();
 
@@ -93,8 +157,25 @@ const convertToMinutes = (time) => {
   return hours * 60 + minutes;
 };
 
+const convertToBackendTime = (time) => {
+  const totalMinutes = convertToMinutes(time);
+
+  if (totalMinutes < 0) {
+    return "";
+  }
+
+  const hours24 = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+
+  return `${String(hours24).padStart(2, "0")}:${String(
+    minutes
+  ).padStart(2, "0")}`;
+};
+
 const normalizeTime = (time) => {
-  if (!time) return "";
+  if (!time) {
+    return "";
+  }
 
   const value = String(time).trim().toUpperCase();
 
@@ -121,6 +202,7 @@ const getNextTime = (time) => {
   }
 
   const nextMinutes = totalMinutes + 60;
+
   const hours24 = Math.floor(nextMinutes / 60) % 24;
   const minutes = nextMinutes % 60;
 
@@ -148,31 +230,50 @@ const getBookingList = (data) => {
   return [];
 };
 
-const getTodayString = () => {
-  const date = new Date();
-
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-
-  return `${year}-${month}-${day}`;
-};
-
 const BookingSection = () => {
-  const params = useParams();
+  const { turfId: routeTurfId, id: routeId } = useParams();
 
-  const routeTurfId = params.turfId || params.id;
+  const rawIdentifier = routeTurfId || routeId || "";
 
   const turfIdentifier = decodeURIComponent(
-    String(routeTurfId || "")
+    String(rawIdentifier)
   ).trim();
+
+  const today = useMemo(() => getTodayString(), []);
+
+  const todayParts = useMemo(() => {
+    const [year, month, day] = today.split("-");
+
+    return {
+      year,
+      month,
+      day,
+    };
+  }, [today]);
+
+  const currentYear = Number(todayParts.year);
+
+  const yearOptions = useMemo(() => {
+    return Array.from(
+      { length: 3 },
+      (_, index) => currentYear + index
+    );
+  }, [currentYear]);
 
   const [turf, setTurf] = useState(null);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  const [selectedDate, setSelectedDate] = useState("");
+  /*
+   * Keep day, month and year separate.
+   * This is important because the user can select
+   * them in any order without resetting previous values.
+   */
+  const [selectedDay, setSelectedDay] = useState("");
+  const [selectedMonth, setSelectedMonth] = useState("");
+  const [selectedYear, setSelectedYear] = useState("");
+
   const [selectedSlot, setSelectedSlot] = useState("");
 
   const [bookings, setBookings] = useState([]);
@@ -183,115 +284,173 @@ const BookingSection = () => {
 
   const [retryKey, setRetryKey] = useState(0);
 
-  const today = useMemo(() => getTodayString(), []);
-
   /*
-   * Load turf from MongoDB through backend.
+   * Find turf from local data.
+   *
+   * Supports:
+   * - turf-001
+   * - green-field-sports-arena
    */
   useEffect(() => {
-    const controller = new AbortController();
+    if (!turfIdentifier) {
+      setTurf(null);
+      setError("Invalid turf ID.");
+      setLoading(false);
+      return;
+    }
 
-    const fetchTurf = async () => {
-      if (!turfIdentifier) {
-        setTurf(null);
-        setError("Invalid turf ID.");
-        setLoading(false);
-        return;
-      }
+    setLoading(true);
+    setError("");
 
-      try {
-        setLoading(true);
-        setError("");
+    const decodedIdentifier = turfIdentifier.toLowerCase();
 
-        const response = await fetch(
-          `${API_URL}/turfs/${encodeURIComponent(
-            turfIdentifier
-          )}`,
-          {
-            method: "GET",
-            signal: controller.signal,
-          }
-        );
+    const foundTurf = turfs.find((item) => {
+      const itemId = String(item?.id || "")
+        .trim()
+        .toLowerCase();
 
-        const data = await response.json().catch(() => ({}));
+      const itemSlug = String(item?.slug || "")
+        .trim()
+        .toLowerCase();
 
-        if (!response.ok) {
-          throw new Error(
-            data?.message || "Failed to load turf."
-          );
-        }
+      return (
+        itemId === decodedIdentifier ||
+        itemSlug === decodedIdentifier
+      );
+    });
 
-        const turfData =
-          data?.turf ||
-          data?.data ||
-          data;
+    if (!foundTurf) {
+      setTurf(null);
+      setError("The selected turf was not found.");
+      setLoading(false);
+      return;
+    }
 
-        if (
-          !turfData ||
-          typeof turfData !== "object" ||
-          Array.isArray(turfData)
-        ) {
-          throw new Error(
-            "Invalid turf data received from server."
-          );
-        }
-
-        const returnedId = String(
-          turfData._id ||
-            turfData.id ||
-            ""
-        ).trim();
-
-        if (!returnedId) {
-          throw new Error(
-            "Turf ID is missing from server response."
-          );
-        }
-
-        setTurf(turfData);
-      } catch (err) {
-        if (err.name === "AbortError") {
-          return;
-        }
-
-        console.error("Failed to load turf:", err);
-
-        setTurf(null);
-        setError(
-          err?.message ||
-            "Failed to load turf. Please try again."
-        );
-      } finally {
-        if (!controller.signal.aborted) {
-          setLoading(false);
-        }
-      }
-    };
-
-    fetchTurf();
-
-    return () => {
-      controller.abort();
-    };
+    setTurf(foundTurf);
+    setLoading(false);
   }, [turfIdentifier]);
 
-  const turfId = String(
-    turf?._id ||
-      turf?.id ||
-      turfIdentifier ||
-      ""
-  ).trim();
+  /*
+   * Build complete backend date only when
+   * Day + Month + Year are all selected.
+   */
+  const selectedDate = useMemo(() => {
+    if (
+      !selectedYear ||
+      !selectedMonth ||
+      !selectedDay
+    ) {
+      return "";
+    }
+
+    const maxDays = getDaysInMonth(
+      Number(selectedYear),
+      Number(selectedMonth)
+    );
+
+    if (Number(selectedDay) > maxDays) {
+      return "";
+    }
+
+    return buildDateString(
+      selectedYear,
+      selectedMonth,
+      selectedDay
+    );
+  }, [
+    selectedYear,
+    selectedMonth,
+    selectedDay,
+  ]);
 
   /*
-   * Load existing bookings for selected date.
+   * Calculate valid days for selected month/year.
+   */
+  const availableDays = useMemo(() => {
+    if (!selectedYear || !selectedMonth) {
+      return 31;
+    }
+
+    return getDaysInMonth(
+      Number(selectedYear),
+      Number(selectedMonth)
+    );
+  }, [selectedYear, selectedMonth]);
+
+  const dayOptions = useMemo(() => {
+    return Array.from(
+      { length: availableDays },
+      (_, index) => index + 1
+    );
+  }, [availableDays]);
+
+  /*
+   * If current selected day becomes invalid after
+   * changing month/year, adjust it automatically.
+   *
+   * Example:
+   * 31 January -> February
+   * becomes 28 February.
+   */
+  useEffect(() => {
+    if (!selectedYear || !selectedMonth || !selectedDay) {
+      return;
+    }
+
+    const maxDays = getDaysInMonth(
+      Number(selectedYear),
+      Number(selectedMonth)
+    );
+
+    if (Number(selectedDay) > maxDays) {
+      setSelectedDay(String(maxDays).padStart(2, "0"));
+    }
+  }, [
+    selectedYear,
+    selectedMonth,
+    selectedDay,
+  ]);
+
+  /*
+   * Reset selected slot when the complete date changes.
+   */
+  useEffect(() => {
+    setSelectedSlot("");
+  }, [selectedDate]);
+
+  /*
+   * Load availability only after a complete date
+   * has been selected.
    */
   useEffect(() => {
     const controller = new AbortController();
 
     const fetchAvailability = async () => {
-      if (!turfId || !selectedDate) {
+      if (!turf || !selectedDate) {
         setBookings([]);
         setAvailabilityError("");
+        setAvailabilityLoading(false);
+        return;
+      }
+
+      if (isDateBeforeToday(selectedDate)) {
+        setBookings([]);
+        setAvailabilityError(
+          "Please select today or a future date."
+        );
+        setAvailabilityLoading(false);
+        return;
+      }
+
+      const backendTurfId = String(
+        turf.id || turf._id || ""
+      ).trim();
+
+      if (!backendTurfId) {
+        setBookings([]);
+        setAvailabilityError(
+          "Turf ID is missing."
+        );
         setAvailabilityLoading(false);
         return;
       }
@@ -299,12 +458,15 @@ const BookingSection = () => {
       try {
         setAvailabilityLoading(true);
         setAvailabilityError("");
-        setSelectedSlot("");
 
         const url =
           `${API_URL}/bookings/availability` +
-          `?turfId=${encodeURIComponent(turfId)}` +
-          `&date=${encodeURIComponent(selectedDate)}`;
+          `?turfId=${encodeURIComponent(
+            backendTurfId
+          )}` +
+          `&date=${encodeURIComponent(
+            selectedDate
+          )}`;
 
         const response = await fetch(url, {
           method: "GET",
@@ -366,11 +528,39 @@ const BookingSection = () => {
     return () => {
       controller.abort();
     };
-  }, [turfId, selectedDate, retryKey]);
+  }, [
+    turf,
+    selectedDate,
+    retryKey,
+  ]);
 
   /*
-   * Loading state.
+   * Date selection handlers.
+   *
+   * Important:
+   * We NEVER clear the other date fields here.
    */
+  const handleDayChange = (event) => {
+    const value = event.target.value;
+
+    setSelectedDay(value);
+    setAvailabilityError("");
+  };
+
+  const handleMonthChange = (event) => {
+    const value = event.target.value;
+
+    setSelectedMonth(value);
+    setAvailabilityError("");
+  };
+
+  const handleYearChange = (event) => {
+    const value = event.target.value;
+
+    setSelectedYear(value);
+    setAvailabilityError("");
+  };
+
   if (loading) {
     return (
       <main className="flex min-h-[70vh] items-center justify-center bg-gray-50 px-4">
@@ -388,9 +578,6 @@ const BookingSection = () => {
     );
   }
 
-  /*
-   * Turf loading error.
-   */
   if (error || !turf) {
     return (
       <main className="flex min-h-[70vh] items-center justify-center bg-gray-50 px-4">
@@ -414,7 +601,9 @@ const BookingSection = () => {
           <div className="mt-6 flex flex-col justify-center gap-3 sm:flex-row">
             <button
               type="button"
-              onClick={() => window.location.reload()}
+              onClick={() =>
+                window.location.reload()
+              }
               className="inline-flex items-center justify-center gap-2 rounded-xl bg-gray-900 px-5 py-3 text-sm font-semibold text-white transition hover:bg-gray-800"
             >
               <RefreshCw size={16} />
@@ -499,7 +688,7 @@ const BookingSection = () => {
   const isToday = selectedDate === today;
 
   /*
-   * Check whether a slot is inside turf opening hours.
+   * Check turf operating hours.
    */
   const isWithinOperatingHours = (slot) => {
     const slotStart = convertToMinutes(slot);
@@ -517,9 +706,6 @@ const BookingSection = () => {
       return true;
     }
 
-    /*
-     * Handles normal same-day opening/closing.
-     */
     if (closingMinutes > openingMinutes) {
       return (
         slotStart >= openingMinutes &&
@@ -528,8 +714,8 @@ const BookingSection = () => {
     }
 
     /*
-     * Handles overnight hours such as
-     * 06:00 PM - 02:00 AM.
+     * Overnight turf hours.
+     * Example: 06:00 PM - 02:00 AM.
      */
     return (
       slotStart >= openingMinutes ||
@@ -538,7 +724,7 @@ const BookingSection = () => {
   };
 
   /*
-   * Check today's already-passed slots.
+   * Disable already-passed slots for today.
    */
   const isPastSlot = (slot) => {
     if (!isToday) {
@@ -561,8 +747,7 @@ const BookingSection = () => {
   };
 
   /*
-   * Check whether selected slot overlaps
-   * an existing pending/confirmed booking.
+   * Check existing booking overlap.
    */
   const isSlotBooked = (slot) => {
     const slotStart = convertToMinutes(slot);
@@ -575,11 +760,19 @@ const BookingSection = () => {
 
     return bookings.some((booking) => {
       const bookingStart = convertToMinutes(
-        normalizeTime(booking?.startTime)
+        normalizeTime(
+          booking?.startTime ||
+            booking?.start ||
+            ""
+        )
       );
 
       const bookingEnd = convertToMinutes(
-        normalizeTime(booking?.endTime)
+        normalizeTime(
+          booking?.endTime ||
+            booking?.end ||
+            ""
+        )
       );
 
       if (
@@ -616,13 +809,32 @@ const BookingSection = () => {
     ? getNextTime(selectedSlot)
     : "";
 
+  const backendStartTime = selectedSlot
+    ? convertToBackendTime(selectedSlot)
+    : "";
+
+  const backendEndTime = selectedEndTime
+    ? convertToBackendTime(selectedEndTime)
+    : "";
+
   const bookingReady = Boolean(
-    selectedDate && selectedSlot
+    selectedDate &&
+      selectedSlot &&
+      backendStartTime &&
+      backendEndTime
   );
+
+  /*
+   * Use local turf ID.
+   * Example: turf-001
+   */
+  const bookingTurfId = String(
+    turf.id || turf._id || turfIdentifier
+  ).trim();
 
   const bookingUrl = bookingReady
     ? `/booking/${encodeURIComponent(
-        turfId
+        bookingTurfId
       )}?date=${encodeURIComponent(
         selectedDate
       )}&slot=${encodeURIComponent(
@@ -630,13 +842,20 @@ const BookingSection = () => {
       )}`
     : "#";
 
+  const dateSelectionComplete = Boolean(
+    selectedDay &&
+      selectedMonth &&
+      selectedYear
+  );
+
   return (
     <main className="min-h-screen bg-gray-50">
+      {/* Back navigation */}
       <section className="border-b border-gray-200 bg-white">
         <div className="mx-auto max-w-7xl px-4 py-5 sm:px-6 lg:px-8">
           <Link
             to={`/turfs/${encodeURIComponent(
-              turfId
+              turfIdentifier
             )}`}
             className="inline-flex items-center gap-2 text-sm font-medium text-gray-500 transition hover:text-green-600"
           >
@@ -780,35 +999,159 @@ const BookingSection = () => {
 
             {/* Date */}
             <div className="mt-6">
-              <label
-                htmlFor="booking-date"
-                className="mb-2 block text-sm font-medium text-gray-900"
-              >
+              <label className="mb-2 block text-sm font-medium text-gray-900">
                 Select date
               </label>
 
-              <div className="relative">
-                <CalendarDays
-                  size={18}
-                  className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
-                />
+              <div className="grid grid-cols-3 gap-2">
+                {/* Day */}
+                <div className="relative">
+                  <select
+                    value={selectedDay}
+                    onChange={handleDayChange}
+                    className={`h-12 w-full appearance-none rounded-xl border bg-white px-3 pr-8 text-sm outline-none transition focus:border-green-500 focus:ring-4 focus:ring-green-500/10 ${
+                      selectedDay
+                        ? "border-gray-200 text-gray-700"
+                        : "border-gray-200 text-gray-400"
+                    }`}
+                  >
+                    <option value="">
+                      Day
+                    </option>
 
-                <input
-                  id="booking-date"
-                  type="date"
-                  value={selectedDate}
-                  min={today}
-                  onChange={(event) => {
-                    const value =
-                      event.target.value;
+                    {dayOptions.map((day) => {
+                      const value = String(
+                        day
+                      ).padStart(2, "0");
 
-                    setSelectedDate(value);
-                    setSelectedSlot("");
-                    setAvailabilityError("");
-                  }}
-                  className="h-12 w-full rounded-xl border border-gray-200 bg-white pl-10 pr-4 text-sm text-gray-700 outline-none transition focus:border-green-500 focus:ring-4 focus:ring-green-500/10"
-                />
+                      return (
+                        <option
+                          key={value}
+                          value={value}
+                        >
+                          {value}
+                        </option>
+                      );
+                    })}
+                  </select>
+
+                  <ChevronDown
+                    size={16}
+                    className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400"
+                  />
+                </div>
+
+                {/* Month */}
+                <div className="relative">
+                  <select
+                    value={selectedMonth}
+                    onChange={handleMonthChange}
+                    className={`h-12 w-full appearance-none rounded-xl border bg-white px-3 pr-8 text-sm outline-none transition focus:border-green-500 focus:ring-4 focus:ring-green-500/10 ${
+                      selectedMonth
+                        ? "border-gray-200 text-gray-700"
+                        : "border-gray-200 text-gray-400"
+                    }`}
+                  >
+                    <option value="">
+                      Month
+                    </option>
+
+                    {MONTHS.map(
+                      (month, index) => {
+                        const value =
+                          String(index + 1).padStart(
+                            2,
+                            "0"
+                          );
+
+                        return (
+                          <option
+                            key={value}
+                            value={value}
+                          >
+                            {month}
+                          </option>
+                        );
+                      }
+                    )}
+                  </select>
+
+                  <ChevronDown
+                    size={16}
+                    className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400"
+                  />
+                </div>
+
+                {/* Year */}
+                <div className="relative">
+                  <select
+                    value={selectedYear}
+                    onChange={handleYearChange}
+                    className={`h-12 w-full appearance-none rounded-xl border bg-white px-3 pr-8 text-sm outline-none transition focus:border-green-500 focus:ring-4 focus:ring-green-500/10 ${
+                      selectedYear
+                        ? "border-gray-200 text-gray-700"
+                        : "border-gray-200 text-gray-400"
+                    }`}
+                  >
+                    <option value="">
+                      Year
+                    </option>
+
+                    {yearOptions.map(
+                      (year) => (
+                        <option
+                          key={year}
+                          value={String(year)}
+                        >
+                          {year}
+                        </option>
+                      )
+                    )}
+                  </select>
+
+                  <ChevronDown
+                    size={16}
+                    className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400"
+                  />
+                </div>
               </div>
+
+              {/* Date status */}
+              {!dateSelectionComplete ? (
+                <div className="mt-3 flex items-start gap-2 rounded-xl bg-gray-50 px-3 py-2.5 text-xs leading-5 text-gray-500">
+                  <CalendarDays
+                    size={15}
+                    className="mt-0.5 shrink-0 text-gray-400"
+                  />
+
+                  <span>
+                    Select day, month and year.
+                  </span>
+                </div>
+              ) : selectedDate ? (
+                <div className="mt-3 flex items-center gap-2 rounded-xl bg-green-50 px-3 py-2.5 text-sm font-medium text-green-700">
+                  <CalendarDays size={16} />
+                  {formatDate(selectedDate)}
+                </div>
+              ) : (
+                <div className="mt-3 flex items-start gap-2 rounded-xl bg-red-50 px-3 py-2.5 text-xs leading-5 text-red-600">
+                  <AlertCircle
+                    size={15}
+                    className="mt-0.5 shrink-0"
+                  />
+
+                  <span>
+                    Please select a valid date.
+                  </span>
+                </div>
+              )}
+
+              {availabilityError &&
+                !availabilityLoading && (
+                  <p className="mt-2 text-xs text-red-500">
+                    {availabilityError}
+                  </p>
+                )}
             </div>
 
             {/* Time slots */}
@@ -835,8 +1178,8 @@ const BookingSection = () => {
                   />
 
                   <span>
-                    Select a date to check
-                    available slots.
+                    Select day, month and year to
+                    check available slots.
                   </span>
                 </div>
               ) : availabilityLoading ? (
@@ -865,7 +1208,8 @@ const BookingSection = () => {
                     type="button"
                     onClick={() =>
                       setRetryKey(
-                        (current) => current + 1
+                        (current) =>
+                          current + 1
                       )
                     }
                     className="mt-3 inline-flex items-center gap-1.5 text-xs font-semibold text-red-600 hover:text-red-700"
@@ -893,9 +1237,7 @@ const BookingSection = () => {
                           type="button"
                           disabled={disabled}
                           onClick={() =>
-                            setSelectedSlot(
-                              slot
-                            )
+                            setSelectedSlot(slot)
                           }
                           className={`relative flex items-center justify-center gap-1.5 rounded-lg border px-3 py-3 text-xs font-medium transition ${
                             isSelected
@@ -924,6 +1266,11 @@ const BookingSection = () => {
                             <span className="text-[10px]">
                               Closed
                             </span>
+                          ) : status ===
+                            "past" ? (
+                            <span className="text-[10px]">
+                              Past
+                            </span>
                           ) : (
                             <Clock size={13} />
                           )}
@@ -932,6 +1279,8 @@ const BookingSection = () => {
                             "booked" &&
                             status !==
                               "closed" &&
+                            status !==
+                              "past" &&
                             slot}
                         </button>
                       );
@@ -955,12 +1304,17 @@ const BookingSection = () => {
                         Past
                       </span>
                     )}
+
+                    <span className="flex items-center gap-1.5">
+                      <span className="h-2 w-2 rounded-full bg-gray-200" />
+                      Closed
+                    </span>
                   </div>
                 </>
               )}
             </div>
 
-            {/* Summary */}
+            {/* Booking summary */}
             {bookingReady && (
               <div className="mt-6 rounded-xl bg-gray-50 p-4">
                 <h3 className="text-sm font-semibold text-gray-900">
@@ -974,9 +1328,7 @@ const BookingSection = () => {
                     </span>
 
                     <span className="font-medium text-gray-900">
-                      {formatDate(
-                        selectedDate
-                      )}
+                      {formatDate(selectedDate)}
                     </span>
                   </div>
 

@@ -40,38 +40,23 @@ const MyBookings = () => {
           currentUser.email.trim().toLowerCase(),
         );
 
-        const response = await fetch(
-          `${API_URL}/bookings/user/${email}`,
-        );
+        const response = await fetch(`${API_URL}/bookings/user/${email}`);
 
         const data = await response.json();
 
         console.log("My bookings API response:", data);
 
         if (!response.ok) {
-          throw new Error(
-            data?.message ||
-              "Failed to fetch bookings",
-          );
+          throw new Error(data?.message || "Failed to fetch bookings");
         }
 
-        const bookingList = Array.isArray(
-          data?.bookings,
-        )
-          ? data.bookings
-          : [];
+        const bookingList = Array.isArray(data?.bookings) ? data.bookings : [];
 
         setBookings(bookingList);
       } catch (error) {
-        console.error(
-          "My bookings error:",
-          error,
-        );
+        console.error("My bookings error:", error);
 
-        setError(
-          error?.message ||
-            "Failed to load your bookings.",
-        );
+        setError(error?.message || "Failed to load your bookings.");
 
         setBookings([]);
       } finally {
@@ -91,56 +76,36 @@ const MyBookings = () => {
       return String(date);
     }
 
-    return parsedDate.toLocaleDateString(
-      "en-GB",
-      {
-        day: "2-digit",
-        month: "short",
-        year: "numeric",
-      },
-    );
+    return parsedDate.toLocaleDateString("en-GB", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    });
   };
 
   const formatTime = (time) => {
     if (!time) return "N/A";
 
-    const [hours, minutes] =
-      String(time).split(":");
+    const [hours, minutes] = String(time).split(":");
 
-    if (
-      hours === undefined ||
-      minutes === undefined
-    ) {
+    if (hours === undefined || minutes === undefined) {
       return String(time);
     }
 
     const date = new Date();
 
-    date.setHours(
-      Number(hours),
-      Number(minutes),
-      0,
-      0,
-    );
+    date.setHours(Number(hours), Number(minutes), 0, 0);
 
-    return date.toLocaleTimeString(
-      "en-US",
-      {
-        hour: "2-digit",
-        minute: "2-digit",
-      },
-    );
+    return date.toLocaleTimeString("en-US", {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
   };
 
   const getDisplayStatus = (booking) => {
-    const status = String(
-      booking?.status || "",
-    ).toLowerCase();
+    const status = String(booking?.status || "").toLowerCase();
 
-    if (
-      status === "cancelled" ||
-      status === "canceled"
-    ) {
+    if (status === "cancelled" || status === "canceled") {
       return "Cancelled";
     }
 
@@ -149,21 +114,14 @@ const MyBookings = () => {
     }
 
     if (booking?.date) {
-      const bookingDate = new Date(
-        `${booking.date}T00:00:00`,
-      );
+      const bookingDate = new Date(`${booking.date}T00:00:00`);
 
       const today = new Date();
 
       bookingDate.setHours(0, 0, 0, 0);
       today.setHours(0, 0, 0, 0);
 
-      if (
-        !Number.isNaN(
-          bookingDate.getTime(),
-        ) &&
-        bookingDate < today
-      ) {
+      if (!Number.isNaN(bookingDate.getTime()) && bookingDate < today) {
         return "Completed";
       }
     }
@@ -172,16 +130,12 @@ const MyBookings = () => {
   };
 
   const filteredBookings = useMemo(() => {
-    const searchText =
-      search.trim().toLowerCase();
+    const searchText = search.trim().toLowerCase();
 
     return bookings.filter((booking) => {
-      const displayStatus =
-        getDisplayStatus(booking);
+      const displayStatus = getDisplayStatus(booking);
 
-      const matchesTab =
-        activeTab === "All" ||
-        displayStatus === activeTab;
+      const matchesTab = activeTab === "All" || displayStatus === activeTab;
 
       if (!searchText) {
         return matchesTab;
@@ -201,12 +155,7 @@ const MyBookings = () => {
         .join(" ")
         .toLowerCase();
 
-      return (
-        matchesTab &&
-        searchableText.includes(
-          searchText,
-        )
-      );
+      return matchesTab && searchableText.includes(searchText);
     });
   }, [bookings, activeTab, search]);
 
@@ -244,9 +193,7 @@ const MyBookings = () => {
         </Link>
 
         <div className="mt-6">
-          <p className="text-sm font-medium text-green-600">
-            Dashboard
-          </p>
+          <p className="text-sm font-medium text-green-600">Dashboard</p>
 
           <h1 className="mt-1 text-2xl font-bold text-gray-900 sm:text-3xl">
             My Bookings
@@ -261,18 +208,11 @@ const MyBookings = () => {
       {/* Filters */}
       <div className="mt-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex flex-wrap gap-2">
-          {[
-            "All",
-            "Upcoming",
-            "Completed",
-            "Cancelled",
-          ].map((tab) => (
+          {["All", "Upcoming", "Completed", "Cancelled"].map((tab) => (
             <button
               key={tab}
               type="button"
-              onClick={() =>
-                setActiveTab(tab)
-              }
+              onClick={() => setActiveTab(tab)}
               className={`rounded-lg px-4 py-2 text-sm font-medium transition ${
                 activeTab === tab
                   ? "bg-green-600 text-white"
@@ -297,9 +237,7 @@ const MyBookings = () => {
           <input
             type="text"
             value={search}
-            onChange={(e) =>
-              setSearch(e.target.value)
-            }
+            onChange={(e) => setSearch(e.target.value)}
             placeholder="Search bookings..."
             className="
               h-11 w-full rounded-xl
@@ -335,23 +273,16 @@ const MyBookings = () => {
       {/* Loading */}
       {loading && (
         <div className="mt-10 flex flex-col items-center justify-center py-16">
-          <Loader2
-            size={32}
-            className="animate-spin text-green-600"
-          />
+          <Loader2 size={32} className="animate-spin text-green-600" />
 
-          <p className="mt-4 text-sm text-gray-500">
-            Loading your bookings...
-          </p>
+          <p className="mt-4 text-sm text-gray-500">Loading your bookings...</p>
         </div>
       )}
 
       {/* Error */}
       {!loading && error && (
         <div className="mt-6 rounded-2xl border border-red-100 bg-red-50 p-6 text-center">
-          <p className="text-sm font-medium text-red-600">
-            {error}
-          </p>
+          <p className="text-sm font-medium text-red-600">{error}</p>
 
           <p className="mt-2 text-xs text-red-500">
             Check the browser console for the API response.
@@ -364,23 +295,13 @@ const MyBookings = () => {
         <div className="mt-6 space-y-4">
           {filteredBookings.length > 0 ? (
             filteredBookings.map((booking) => {
-              const displayStatus =
-                getDisplayStatus(
-                  booking,
-                );
+              const displayStatus = getDisplayStatus(booking);
 
-              const location =
-                booking?.turfLocation ||
-                booking?.location ||
-                "";
+              const location = booking?.turfLocation || booking?.location || "";
 
               return (
                 <article
-                  key={
-                    booking?._id ||
-                    booking?.bookingId ||
-                    booking?.id
-                  }
+                  key={booking?._id || booking?.bookingId || booking?.id}
                   className="
                     rounded-2xl
                     border border-gray-200
@@ -403,15 +324,11 @@ const MyBookings = () => {
 
                         <span className="text-xs text-gray-400">
                           {booking?.bookingId
-                            ? `KHL-${String(
-                                booking.bookingId,
-                              )
+                            ? `KHL-${String(booking.bookingId)
                                 .slice(-6)
                                 .toUpperCase()}`
                             : booking?._id
-                              ? `KHL-${String(
-                                  booking._id,
-                                )
+                              ? `KHL-${String(booking._id)
                                   .slice(-6)
                                   .toUpperCase()}`
                               : "Booking"}
@@ -419,8 +336,7 @@ const MyBookings = () => {
                       </div>
 
                       <h2 className="mt-3 text-lg font-bold text-gray-900">
-                        {booking?.turfName ||
-                          "Turf"}
+                        {booking?.turfName || "Turf"}
                       </h2>
 
                       <div className="mt-3 flex flex-wrap gap-x-5 gap-y-3 text-sm text-gray-500">
@@ -432,27 +348,19 @@ const MyBookings = () => {
                         )}
 
                         <span className="flex items-center gap-1.5">
-                          <CalendarDays
-                            size={16}
-                          />
+                          <CalendarDays size={16} />
 
-                          {formatDate(
-                            booking?.date,
-                          )}
+                          {formatDate(booking?.date)}
                         </span>
 
                         <span className="flex items-center gap-1.5">
                           <Clock3 size={16} />
 
-                          {formatTime(
-                            booking?.startTime,
-                          )}
+                          {formatTime(booking?.startTime)}
 
                           {" - "}
 
-                          {formatTime(
-                            booking?.endTime,
-                          )}
+                          {formatTime(booking?.endTime)}
                         </span>
                       </div>
 
@@ -460,25 +368,18 @@ const MyBookings = () => {
                         <span
                           className={`text-xs font-medium ${
                             String(
-                              booking?.paymentStatus ||
-                                "",
-                            ).toLowerCase() ===
-                            "paid"
+                              booking?.paymentStatus || "",
+                            ).toLowerCase() === "paid"
                               ? "text-green-600"
                               : "text-orange-500"
                           }`}
                         >
-                          Payment:{" "}
-                          {booking?.paymentStatus ||
-                            "Unpaid"}
+                          Payment: {booking?.paymentStatus || "Unpaid"}
                         </span>
 
                         {booking?.ownerEmail && (
                           <span className="text-xs text-gray-400">
-                            Owner:{" "}
-                            {
-                              booking.ownerEmail
-                            }
+                            Owner: {booking.ownerEmail}
                           </span>
                         )}
                       </div>
@@ -486,37 +387,19 @@ const MyBookings = () => {
 
                     <div className="flex items-center justify-between gap-5 lg:block lg:text-right">
                       <div>
-                        <p className="text-xs text-gray-400">
-                          Total Amount
-                        </p>
+                        <p className="text-xs text-gray-400">Total Amount</p>
 
                         <p className="mt-1 text-xl font-bold text-gray-900">
-                          ৳
-                          {Number(
-                            booking?.price ||
-                              0,
-                          ).toLocaleString()}
+                          ৳{Number(booking?.price || 0).toLocaleString()}
                         </p>
                       </div>
 
-                      <button
-                        type="button"
-                        className="
-                          mt-3 inline-flex
-                          items-center gap-2
-                          rounded-lg
-                          border border-gray-200
-                          px-4 py-2
-                          text-sm font-medium
-                          text-gray-700
-                          transition
-                          hover:border-green-500
-                          hover:text-green-600
-                        "
+                      <Link
+                        to={`/dashboard/bookings/${booking.id}`}
+                        className="text-sm font-semibold text-green-600 hover:text-green-700"
                       >
-                        <Eye size={16} />
                         Details
-                      </button>
+                      </Link>
                     </div>
                   </div>
                 </article>
@@ -524,10 +407,7 @@ const MyBookings = () => {
             })
           ) : (
             <div className="rounded-2xl border border-gray-200 bg-white py-16 text-center">
-              <CalendarDays
-                size={32}
-                className="mx-auto text-gray-300"
-              />
+              <CalendarDays size={32} className="mx-auto text-gray-300" />
 
               <h2 className="mt-4 font-semibold text-gray-900">
                 No bookings found

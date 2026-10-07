@@ -13,9 +13,7 @@ import {
   RefreshCw,
 } from "lucide-react";
 
-const API_URL = (
-  import.meta.env.VITE_API_URL || "http://localhost:3000"
-).replace(/\/$/, "");
+import { turfs } from "../data/turfs";
 
 const FALLBACK_IMAGE =
   "https://placehold.co/1200x800?text=No+Turf+Image";
@@ -31,54 +29,44 @@ const BookingConfirmation = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
+  // =========================
+  // LOAD LOCAL TURF
+  // =========================
+
   useEffect(() => {
-    const controller = new AbortController();
-
-    const fetchTurf = async () => {
-      const turfId = decodeURIComponent(String(id || "")).trim();
-
-      if (!turfId) {
-        setError("Invalid turf ID.");
-        setLoading(false);
-        return;
-      }
-
+    const loadTurf = () => {
       try {
         setLoading(true);
         setError("");
 
-        const response = await fetch(
-          `${API_URL}/turfs/${encodeURIComponent(turfId)}`,
-          {
-            method: "GET",
-            signal: controller.signal,
-          }
-        );
+        const turfId = decodeURIComponent(
+          String(id || "")
+        ).trim();
 
-        const data = await response.json().catch(() => ({}));
-
-        if (!response.ok) {
-          throw new Error(
-            data?.message || "Failed to load turf."
-          );
-        }
-
-        const turfData = data?.turf || data?.data || data;
-
-        if (
-          !turfData ||
-          typeof turfData !== "object" ||
-          Array.isArray(turfData)
-        ) {
-          throw new Error("Invalid turf data received.");
-        }
-
-        setTurf(turfData);
-      } catch (error) {
-        if (error.name === "AbortError") {
+        if (!turfId) {
+          setError("Invalid turf ID.");
+          setTurf(null);
           return;
         }
 
+        const foundTurf = turfs.find((item) => {
+          const itemId = String(item.id || "").trim();
+          const itemSlug = String(item.slug || "").trim();
+
+          return (
+            itemId === turfId ||
+            itemSlug === turfId
+          );
+        });
+
+        if (!foundTurf) {
+          setTurf(null);
+          setError("Turf not found.");
+          return;
+        }
+
+        setTurf(foundTurf);
+      } catch (error) {
         console.error("Failed to load turf:", error);
 
         setTurf(null);
@@ -86,18 +74,16 @@ const BookingConfirmation = () => {
           error?.message || "Failed to load turf."
         );
       } finally {
-        if (!controller.signal.aborted) {
-          setLoading(false);
-        }
+        setLoading(false);
       }
     };
 
-    fetchTurf();
-
-    return () => {
-      controller.abort();
-    };
+    loadTurf();
   }, [id]);
+
+  // =========================
+  // LOADING
+  // =========================
 
   if (loading) {
     return (
@@ -119,6 +105,10 @@ const BookingConfirmation = () => {
       </main>
     );
   }
+
+  // =========================
+  // TURF NOT FOUND
+  // =========================
 
   if (!turf) {
     return (
@@ -163,9 +153,17 @@ const BookingConfirmation = () => {
     );
   }
 
+  // =========================
+  // TURF ID
+  // =========================
+
   const turfId = String(
-    turf._id || turf.id || id || ""
+    turf.id || turf.slug || id || ""
   ).trim();
+
+  // =========================
+  // BOOKING INFO CHECK
+  // =========================
 
   if (!date || !slot) {
     return (
@@ -199,6 +197,10 @@ const BookingConfirmation = () => {
     );
   }
 
+  // =========================
+  // TURF DATA
+  // =========================
+
   const turfName = String(
     turf.name || "Unnamed Turf"
   ).trim();
@@ -229,6 +231,10 @@ const BookingConfirmation = () => {
   const serviceFee = 50;
   const totalPrice = turfPrice + serviceFee;
 
+  // =========================
+  // DATE
+  // =========================
+
   const formattedDate = new Date(
     `${date}T00:00:00`
   ).toLocaleDateString("en-BD", {
@@ -238,23 +244,39 @@ const BookingConfirmation = () => {
     year: "numeric",
   });
 
+  // =========================
+  // ROUTES
+  // =========================
+
   const bookingUrl = `/turfs/${encodeURIComponent(
     turfId
   )}/book`;
 
   /*
-   * Keep the selected slot unchanged here.
-   * Payment.jsx will convert the display time
-   * into backend-compatible 24-hour values.
+   * Send all required booking/payment information.
+   * Payment page can use these values directly.
    */
+
+  const paymentParams = new URLSearchParams({
+    date,
+    slot,
+    amount: String(totalPrice),
+    turfId,
+    turfName,
+    turfImage,
+    turfLocation,
+    turfSport,
+    turfPrice: String(turfPrice),
+    serviceFee: String(serviceFee),
+  });
+
   const paymentUrl = `/payment/${encodeURIComponent(
     turfId
-  )}?date=${encodeURIComponent(
-    date
-  )}&slot=${encodeURIComponent(slot)}`;
+  )}?${paymentParams.toString()}`;
 
   return (
     <main className="min-h-screen bg-gray-50">
+      {/* HEADER */}
       <section className="border-b border-gray-200 bg-white">
         <div className="mx-auto max-w-6xl px-4 py-5 sm:px-6 lg:px-8">
           <Link
@@ -267,6 +289,7 @@ const BookingConfirmation = () => {
         </div>
       </section>
 
+      {/* CONTENT */}
       <section className="mx-auto max-w-6xl px-4 py-10 sm:px-6 lg:px-8">
         <div className="mb-8">
           <div className="inline-flex items-center gap-2 rounded-full bg-green-50 px-3 py-1.5 text-xs font-semibold text-green-700">
@@ -285,7 +308,9 @@ const BookingConfirmation = () => {
         </div>
 
         <div className="grid gap-8 lg:grid-cols-[1fr_380px]">
+          {/* LEFT */}
           <div className="space-y-6">
+            {/* TURF CARD */}
             <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white">
               <div className="h-56 overflow-hidden sm:h-64">
                 <img
@@ -336,12 +361,14 @@ const BookingConfirmation = () => {
               </div>
             </div>
 
+            {/* BOOKING DETAILS */}
             <div className="rounded-2xl border border-gray-200 bg-white p-6">
               <h2 className="text-lg font-semibold text-gray-900">
                 Booking details
               </h2>
 
               <div className="mt-6 space-y-5">
+                {/* DATE */}
                 <div className="flex items-center gap-4">
                   <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-green-50 text-green-600">
                     <CalendarDays size={20} />
@@ -358,6 +385,7 @@ const BookingConfirmation = () => {
                   </div>
                 </div>
 
+                {/* TIME */}
                 <div className="flex items-center gap-4">
                   <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-green-50 text-green-600">
                     <Clock size={20} />
@@ -376,6 +404,7 @@ const BookingConfirmation = () => {
               </div>
             </div>
 
+            {/* SECURITY */}
             <div className="rounded-2xl border border-green-100 bg-green-50 p-5">
               <div className="flex gap-3">
                 <ShieldCheck
@@ -398,6 +427,7 @@ const BookingConfirmation = () => {
             </div>
           </div>
 
+          {/* RIGHT */}
           <aside>
             <div className="sticky top-24 rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
               <h2 className="text-lg font-semibold text-gray-900">
@@ -405,6 +435,7 @@ const BookingConfirmation = () => {
               </h2>
 
               <div className="mt-6 space-y-4 text-sm">
+                {/* TURF PRICE */}
                 <div className="flex items-center justify-between">
                   <span className="text-gray-500">
                     Turf booking
@@ -415,6 +446,7 @@ const BookingConfirmation = () => {
                   </span>
                 </div>
 
+                {/* SERVICE FEE */}
                 <div className="flex items-center justify-between">
                   <span className="text-gray-500">
                     Service fee
@@ -425,6 +457,7 @@ const BookingConfirmation = () => {
                   </span>
                 </div>
 
+                {/* TOTAL */}
                 <div className="border-t border-gray-100 pt-4">
                   <div className="flex items-center justify-between">
                     <span className="font-semibold text-gray-900">
@@ -438,6 +471,7 @@ const BookingConfirmation = () => {
                 </div>
               </div>
 
+              {/* PAYMENT */}
               <Link
                 to={paymentUrl}
                 className="mt-7 flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-green-600 text-sm font-semibold text-white transition hover:bg-green-700"

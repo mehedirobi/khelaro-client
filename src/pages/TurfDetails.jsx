@@ -1,9 +1,5 @@
 import { useEffect, useState } from "react";
-import {
-  Link,
-  useLocation,
-  useParams,
-} from "react-router-dom";
+import { Link, useLocation, useParams } from "react-router-dom";
 import {
   ArrowLeft,
   ArrowRight,
@@ -35,21 +31,25 @@ const TurfDetails = () => {
   const [error, setError] = useState("");
   const [imageLoading, setImageLoading] = useState(true);
 
-  // Supports different route parameter names.
-  const routeId =
-    params.id ||
-    params.turfId ||
-    params.slug ||
-    "";
+  // Get possible route parameters
+  const routeId = params.id || "";
+  const routeTurfId = params.turfId || "";
+  const routeSlug = params.slug || "";
 
-  // Fallback: get the last part from the current URL.
+  // Fallback: get last URL segment
   const pathnameId = location.pathname
     .split("/")
     .filter(Boolean)
     .pop();
 
   const turfIdentifier = decodeURIComponent(
-    String(routeId || pathnameId || "")
+    String(
+      routeId ||
+        routeTurfId ||
+        routeSlug ||
+        pathnameId ||
+        ""
+    )
   ).trim();
 
   useEffect(() => {
@@ -73,16 +73,12 @@ const TurfDetails = () => {
           turfIdentifier
         )}`;
 
-        console.log("Loading turf:", endpoint);
-
         const response = await fetch(endpoint, {
           method: "GET",
           signal: controller.signal,
         });
 
         const data = await response.json().catch(() => ({}));
-
-        console.log("Turf details response:", data);
 
         if (!response.ok) {
           throw new Error(
@@ -160,6 +156,7 @@ const TurfDetails = () => {
     );
   }
 
+  // Actual turf ID from MongoDB
   const turfId = String(
     turf.id ||
       turf._id ||
@@ -545,9 +542,7 @@ const TurfError = ({ message }) => (
       <div className="mt-6 flex flex-col justify-center gap-3 sm:flex-row">
         <button
           type="button"
-          onClick={() =>
-            window.location.reload()
-          }
+          onClick={() => window.location.reload()}
           className="inline-flex items-center justify-center gap-2 rounded-xl bg-gray-900 px-5 py-3 text-sm font-semibold text-white transition hover:bg-gray-800"
         >
           <RefreshCw size={16} />

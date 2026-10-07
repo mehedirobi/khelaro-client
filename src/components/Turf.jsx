@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   Search,
@@ -6,10 +6,12 @@ import {
   X,
   ChevronDown,
   Map,
+  RefreshCw,
 } from "lucide-react";
 
 import TurfCard from "../components/TurfCard";
-import { turfs } from "../data/turfs";
+
+const API_URL = "http://localhost:3000";
 
 const locations = [
   "All locations",
@@ -25,14 +27,55 @@ const locations = [
 const sports = ["All sports", "Football", "Cricket", "Badminton"];
 
 const Turf = () => {
+  const [turfs, setTurfs] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
   const [search, setSearch] = useState("");
   const [location, setLocation] = useState("All locations");
   const [sport, setSport] = useState("All sports");
   const [sort, setSort] = useState("recommended");
   const [showFilters, setShowFilters] = useState(false);
 
+  const fetchTurfs = async () => {
+    try {
+      setLoading(true);
+      setError("");
+
+      const response = await fetch(`${API_URL}/turfs`);
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch turfs (${response.status})`);
+      }
+
+      const data = await response.json();
+
+      const turfList = Array.isArray(data)
+        ? data
+        : Array.isArray(data.turfs)
+        ? data.turfs
+        : [];
+
+      setTurfs(turfList);
+    } catch (err) {
+      console.error("Turf fetch error:", err);
+      setError(
+        "Unable to load turfs. Please make sure the backend server is running."
+      );
+      setTurfs([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchTurfs();
+  }, []);
+
   const filteredTurfs = useMemo(() => {
     const query = search.trim().toLowerCase();
+    const selectedLocation = location.toLowerCase();
+    const selectedSport = sport.toLowerCase();
 
     const result = turfs.filter((turf) => {
       const name = String(turf.name || "").toLowerCase();
@@ -59,16 +102,13 @@ const Turf = () => {
         features.includes(query) ||
         amenities.includes(query);
 
-      const selectedLocation = location.toLowerCase();
-
       const matchesLocation =
         location === "All locations" ||
         area === selectedLocation ||
         turfLocation.includes(selectedLocation);
 
       const matchesSport =
-        sport === "All sports" ||
-        turfSport === sport.toLowerCase();
+        sport === "All sports" || turfSport === selectedSport;
 
       return matchesSearch && matchesLocation && matchesSport;
     });
@@ -76,19 +116,25 @@ const Turf = () => {
     const sorted = [...result];
 
     if (sort === "price-low") {
-      sorted.sort((a, b) => Number(a.price || 0) - Number(b.price || 0));
+      sorted.sort(
+        (a, b) => Number(a.price || 0) - Number(b.price || 0)
+      );
     }
 
     if (sort === "price-high") {
-      sorted.sort((a, b) => Number(b.price || 0) - Number(a.price || 0));
+      sorted.sort(
+        (a, b) => Number(b.price || 0) - Number(a.price || 0)
+      );
     }
 
     if (sort === "rating") {
-      sorted.sort((a, b) => Number(b.rating || 0) - Number(a.rating || 0));
+      sorted.sort(
+        (a, b) => Number(b.rating || 0) - Number(a.rating || 0)
+      );
     }
 
     return sorted;
-  }, [search, location, sport, sort]);
+  }, [turfs, search, location, sport, sort]);
 
   const clearFilters = () => {
     setSearch("");
@@ -322,10 +368,56 @@ const Turf = () => {
               </div>
             )}
 
-            {filteredTurfs.length > 0 ? (
+            {loading ? (
+              <div className="grid gap-5 md:grid-cols-2">
+                {[1, 2, 3, 4].map((item) => (
+                  <div
+                    key={item}
+                    className="overflow-hidden rounded-2xl border border-gray-200 bg-white"
+                  >
+                    <div className="h-52 animate-pulse bg-gray-200" />
+
+                    <div className="space-y-3 p-5">
+                      <div className="h-5 w-3/4 animate-pulse rounded bg-gray-200" />
+                      <div className="h-4 w-1/2 animate-pulse rounded bg-gray-200" />
+                      <div className="h-4 w-2/3 animate-pulse rounded bg-gray-200" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : error ? (
+              <div className="rounded-2xl border border-red-100 bg-white px-6 py-16 text-center">
+                <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-red-50">
+                  <X size={24} className="text-red-500" />
+                </div>
+
+                <h3 className="mt-5 font-semibold text-gray-900">
+                  Failed to load turfs
+                </h3>
+
+                <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-gray-500">
+                  {error}
+                </p>
+
+                <button
+                  type="button"
+                  onClick={fetchTurfs}
+                  className="mt-5 inline-flex items-center gap-2 rounded-lg bg-gray-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-green-600"
+                >
+                  <RefreshCw size={15} />
+                  Try again
+                </button>
+              </div>
+            ) : filteredTurfs.length > 0 ? (
               <div className="grid gap-5 md:grid-cols-2">
                 {filteredTurfs.map((turf) => (
-                  <TurfCard key={turf.id} turf={turf} />
+                  <TurfCard
+                    key={turf._id || turf.id}
+                    turf={{
+                      ...turf,
+                      id: turf._id || turf.id,
+                    }}
+                  />
                 ))}
               </div>
             ) : (

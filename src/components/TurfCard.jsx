@@ -13,7 +13,7 @@ import useAuth from "../hooks/useAuth";
 
 const API_URL = (
   import.meta.env.VITE_API_URL || "http://localhost:3000"
-).replace(/\/$/, "");
+).replace(/\/+$/, "");
 
 const FALLBACK_IMAGE =
   "https://placehold.co/800x600?text=No+Turf+Image";
@@ -26,7 +26,7 @@ const TurfCard = ({ turf }) => {
   const [wishlistChecking, setWishlistChecking] = useState(false);
   const [wishlistAnimation, setWishlistAnimation] = useState(false);
 
-  const turfId = String(turf?.id || "").trim();
+  const turfId = String(turf?._id || turf?.id || "").trim();
 
   const turfName = String(turf?.name || "Unnamed Turf").trim();
 
@@ -68,6 +68,8 @@ const TurfCard = ({ turf }) => {
     ? String(currentUser.email).trim().toLowerCase()
     : "";
 
+  const detailsId = turfId;
+
   useEffect(() => {
     const controller = new AbortController();
 
@@ -91,21 +93,29 @@ const TurfCard = ({ turf }) => {
           }
         );
 
+        if (response.status === 404) {
+          setIsWishlisted(false);
+          return;
+        }
+
         const data = await response.json().catch(() => ({}));
 
         if (!response.ok) {
           throw new Error(
-            data?.message || "Failed to check wishlist status"
+            data?.message ||
+              `Wishlist status request failed (${response.status})`
           );
         }
 
         setIsWishlisted(Boolean(data?.wishlisted));
       } catch (error) {
-        if (error.name === "AbortError") {
+        if (error?.name === "AbortError") {
           return;
         }
 
         console.error("Wishlist status error:", error);
+
+        // Wishlist failure should not break the turf card.
         setIsWishlisted(false);
       } finally {
         if (!controller.signal.aborted) {
@@ -208,7 +218,7 @@ const TurfCard = ({ turf }) => {
         title: "Wishlist failed",
         text:
           error?.message ||
-          "Something went wrong. Please try again.",
+          "Unable to update wishlist. Please try again.",
         confirmButtonColor: "#16a34a",
       });
     } finally {
@@ -231,6 +241,7 @@ const TurfCard = ({ turf }) => {
           src={turfImage}
           alt={turfName}
           loading="lazy"
+          decoding="async"
           className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
           onError={handleImageError}
         />
@@ -266,6 +277,7 @@ const TurfCard = ({ turf }) => {
               <Loader2
                 size={18}
                 className="relative z-10 animate-spin"
+                aria-hidden="true"
               />
             ) : (
               <Heart
@@ -273,6 +285,7 @@ const TurfCard = ({ turf }) => {
                 strokeWidth={2}
                 className="relative z-10"
                 fill={isWishlisted ? "currentColor" : "none"}
+                aria-hidden="true"
               />
             )}
           </button>
@@ -298,7 +311,11 @@ const TurfCard = ({ turf }) => {
             </h3>
 
             <div className="mt-2 flex items-center gap-1.5 text-xs text-gray-500">
-              <MapPin size={14} className="shrink-0" />
+              <MapPin
+                size={14}
+                className="shrink-0"
+                aria-hidden="true"
+              />
 
               <span
                 className="truncate"
@@ -313,10 +330,11 @@ const TurfCard = ({ turf }) => {
             <Star
               size={13}
               fill={hasRating ? "currentColor" : "none"}
+              aria-hidden="true"
             />
 
             <span>
-              {hasRating ? turfRating : "New"}
+              {hasRating ? turfRating.toFixed(1) : "New"}
             </span>
           </div>
         </div>
@@ -359,9 +377,9 @@ const TurfCard = ({ turf }) => {
             </p>
           </div>
 
-          {turfId ? (
+          {detailsId ? (
             <Link
-              to={`/turfs/${encodeURIComponent(turfId)}`}
+              to={`/turfs/${encodeURIComponent(detailsId)}`}
               aria-label={`View details for ${turfName}`}
               className="group/link inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-gray-900 px-3.5 py-2.5 text-xs font-semibold text-white transition-all duration-200 hover:bg-green-600"
             >
@@ -370,6 +388,7 @@ const TurfCard = ({ turf }) => {
               <ArrowUpRight
                 size={14}
                 className="transition-transform group-hover/link:-translate-y-0.5 group-hover/link:translate-x-0.5"
+                aria-hidden="true"
               />
             </Link>
           ) : (

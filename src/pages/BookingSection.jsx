@@ -41,21 +41,46 @@ const TIME_SLOTS = [
 const formatDate = (date) => {
   if (!date) return "";
 
-  return new Date(`${date}T00:00:00`).toLocaleDateString(
-    "en-BD",
-    {
-      day: "numeric",
-      month: "short",
-      year: "numeric",
-    }
-  );
+  const parsedDate = new Date(`${date}T00:00:00`);
+
+  if (Number.isNaN(parsedDate.getTime())) {
+    return date;
+  }
+
+  return parsedDate.toLocaleDateString("en-BD", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
 };
 
 const convertToMinutes = (time) => {
   if (!time) return -1;
 
-  const [timeValue, period] = time.split(" ");
-  let [hours, minutes] = timeValue.split(":").map(Number);
+  const value = String(time).trim().toUpperCase();
+
+  const match = value.match(
+    /^(\d{1,2}):(\d{2})\s*(AM|PM)$/
+  );
+
+  if (!match) {
+    return -1;
+  }
+
+  let hours = Number(match[1]);
+  const minutes = Number(match[2]);
+  const period = match[3];
+
+  if (
+    !Number.isInteger(hours) ||
+    !Number.isInteger(minutes) ||
+    hours < 1 ||
+    hours > 12 ||
+    minutes < 0 ||
+    minutes > 59
+  ) {
+    return -1;
+  }
 
   if (period === "PM" && hours !== 12) {
     hours += 12;
@@ -66,6 +91,26 @@ const convertToMinutes = (time) => {
   }
 
   return hours * 60 + minutes;
+};
+
+const normalizeTime = (time) => {
+  if (!time) return "";
+
+  const value = String(time).trim().toUpperCase();
+
+  const match = value.match(
+    /^(\d{1,2}):(\d{2})\s*(AM|PM)$/
+  );
+
+  if (!match) {
+    return value;
+  }
+
+  const hours = Number(match[1]) % 12 || 12;
+  const minutes = match[2];
+  const period = match[3];
+
+  return `${String(hours).padStart(2, "0")}:${minutes} ${period}`;
 };
 
 const getNextTime = (time) => {
@@ -87,28 +132,6 @@ const getNextTime = (time) => {
   ).padStart(2, "0")} ${period}`;
 };
 
-const normalizeTime = (time) => {
-  if (!time) return "";
-
-  const value = String(time).trim().toUpperCase();
-
-  const match = value.match(
-    /^(\d{1,2}):(\d{2})\s*(AM|PM)$/
-  );
-
-  if (!match) {
-    return value;
-  }
-
-  let hours = Number(match[1]);
-  const minutes = match[2];
-  const period = match[3];
-
-  hours = hours % 12 || 12;
-
-  return `${String(hours).padStart(2, "0")}:${minutes} ${period}`;
-};
-
 const getBookingList = (data) => {
   if (Array.isArray(data)) {
     return data;
@@ -125,11 +148,23 @@ const getBookingList = (data) => {
   return [];
 };
 
+const getTodayString = () => {
+  const date = new Date();
+
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
+};
+
 const BookingSection = () => {
-  const { turfId: routeTurfId, id } = useParams();
+  const params = useParams();
+
+  const routeTurfId = params.turfId || params.id;
 
   const turfIdentifier = decodeURIComponent(
-    String(routeTurfId || id || "")
+    String(routeTurfId || "")
   ).trim();
 
   const [turf, setTurf] = useState(null);
@@ -140,25 +175,19 @@ const BookingSection = () => {
   const [selectedDate, setSelectedDate] = useState("");
   const [selectedSlot, setSelectedSlot] = useState("");
 
-  const [bookedSlots, setBookedSlots] = useState([]);
+  const [bookings, setBookings] = useState([]);
   const [availabilityLoading, setAvailabilityLoading] =
     useState(false);
   const [availabilityError, setAvailabilityError] =
     useState("");
 
-  const today = useMemo(() => {
-    const date = new Date();
+  const [retryKey, setRetryKey] = useState(0);
 
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(
-      2,
-      "0"
-    );
-    const day = String(date.getDate()).padStart(2, "0");
+  const today = useMemo(() => getTodayString(), []);
 
-    return `${year}-${month}-${day}`;
-  }, []);
-
+  /*
+   * Load turf from MongoDB through backend.
+   */
   useEffect(() => {
     const controller = new AbortController();
 
@@ -214,7 +243,9 @@ const BookingSection = () => {
         ).trim();
 
         if (!returnedId) {
-          throw new Error("Turf ID is missing.");
+          throw new Error(
+            "Turf ID is missing from server response."
+          );
         }
 
         setTurf(turfData);
@@ -244,20 +275,24 @@ const BookingSection = () => {
     };
   }, [turfIdentifier]);
 
-  const turfIdValue = String(
+  const turfId = String(
     turf?._id ||
       turf?.id ||
       turfIdentifier ||
       ""
   ).trim();
 
+  /*
+   * Load existing bookings for selected date.
+   */
   useEffect(() => {
     const controller = new AbortController();
 
     const fetchAvailability = async () => {
-      if (!turfIdValue || !selectedDate) {
-        setBookedSlots([]);
+      if (!turfId || !selectedDate) {
+        setBookings([]);
         setAvailabilityError("");
+        setAvailabilityLoading(false);
         return;
       }
 
@@ -266,15 +301,15 @@ const BookingSection = () => {
         setAvailabilityError("");
         setSelectedSlot("");
 
-        const response = await fetch(
-          `${API_URL}/bookings/availability?turfId=${encodeURIComponent(
-            turfIdValue
-          )}&date=${encodeURIComponent(selectedDate)}`,
-          {
-            method: "GET",
-            signal: controller.signal,
-          }
-        );
+        const url =
+          `${API_URL}/bookings/availability` +
+          `?turfId=${encodeURIComponent(turfId)}` +
+          `&date=${encodeURIComponent(selectedDate)}`;
+
+        const response = await fetch(url, {
+          method: "GET",
+          signal: controller.signal,
+        });
 
         const data = await response
           .json()
@@ -287,9 +322,9 @@ const BookingSection = () => {
           );
         }
 
-        const bookings = getBookingList(data);
+        const bookingList = getBookingList(data);
 
-        const activeBookings = bookings.filter(
+        const activeBookings = bookingList.filter(
           (booking) => {
             const status = String(
               booking?.status || ""
@@ -302,7 +337,7 @@ const BookingSection = () => {
           }
         );
 
-        setBookedSlots(activeBookings);
+        setBookings(activeBookings);
       } catch (err) {
         if (err.name === "AbortError") {
           return;
@@ -313,7 +348,7 @@ const BookingSection = () => {
           err
         );
 
-        setBookedSlots([]);
+        setBookings([]);
 
         setAvailabilityError(
           err?.message ||
@@ -331,8 +366,11 @@ const BookingSection = () => {
     return () => {
       controller.abort();
     };
-  }, [turfIdValue, selectedDate]);
+  }, [turfId, selectedDate, retryKey]);
 
+  /*
+   * Loading state.
+   */
   if (loading) {
     return (
       <main className="flex min-h-[70vh] items-center justify-center bg-gray-50 px-4">
@@ -350,6 +388,9 @@ const BookingSection = () => {
     );
   }
 
+  /*
+   * Turf loading error.
+   */
   if (error || !turf) {
     return (
       <main className="flex min-h-[70vh] items-center justify-center bg-gray-50 px-4">
@@ -370,13 +411,24 @@ const BookingSection = () => {
               "The turf you are trying to book does not exist."}
           </p>
 
-          <Link
-            to="/turfs"
-            className="mt-6 inline-flex items-center gap-2 rounded-xl bg-green-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-green-700"
-          >
-            <ArrowLeft size={17} />
-            Back to Turfs
-          </Link>
+          <div className="mt-6 flex flex-col justify-center gap-3 sm:flex-row">
+            <button
+              type="button"
+              onClick={() => window.location.reload()}
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-gray-900 px-5 py-3 text-sm font-semibold text-white transition hover:bg-gray-800"
+            >
+              <RefreshCw size={16} />
+              Try again
+            </button>
+
+            <Link
+              to="/turfs"
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-green-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-green-700"
+            >
+              <ArrowLeft size={17} />
+              Back to Turfs
+            </Link>
+          </div>
         </div>
       </main>
     );
@@ -425,41 +477,103 @@ const BookingSection = () => {
   const priceValue = Number(turf.price);
 
   const turfPrice =
-    Number.isFinite(priceValue) && priceValue >= 0
+    Number.isFinite(priceValue) &&
+    priceValue >= 0
       ? priceValue
       : 0;
 
-  const openingTime = String(
+  const openingTime = normalizeTime(
     turf.openingTime || "08:00 AM"
-  ).trim();
+  );
 
-  const closingTime = String(
+  const closingTime = normalizeTime(
     turf.closingTime || "11:00 PM"
-  ).trim();
+  );
+
+  const openingMinutes =
+    convertToMinutes(openingTime);
+
+  const closingMinutes =
+    convertToMinutes(closingTime);
 
   const isToday = selectedDate === today;
 
-  const currentTime = new Date();
+  /*
+   * Check whether a slot is inside turf opening hours.
+   */
+  const isWithinOperatingHours = (slot) => {
+    const slotStart = convertToMinutes(slot);
 
-  const currentMinutes =
-    currentTime.getHours() * 60 +
-    currentTime.getMinutes();
+    if (slotStart < 0) {
+      return false;
+    }
 
+    const slotEnd = slotStart + 60;
+
+    if (
+      openingMinutes < 0 ||
+      closingMinutes < 0
+    ) {
+      return true;
+    }
+
+    /*
+     * Handles normal same-day opening/closing.
+     */
+    if (closingMinutes > openingMinutes) {
+      return (
+        slotStart >= openingMinutes &&
+        slotEnd <= closingMinutes
+      );
+    }
+
+    /*
+     * Handles overnight hours such as
+     * 06:00 PM - 02:00 AM.
+     */
+    return (
+      slotStart >= openingMinutes ||
+      slotEnd <= closingMinutes
+    );
+  };
+
+  /*
+   * Check today's already-passed slots.
+   */
   const isPastSlot = (slot) => {
     if (!isToday) {
       return false;
     }
 
-    return (
-      convertToMinutes(slot) <= currentMinutes
-    );
+    const slotStart = convertToMinutes(slot);
+
+    if (slotStart < 0) {
+      return true;
+    }
+
+    const now = new Date();
+
+    const currentMinutes =
+      now.getHours() * 60 +
+      now.getMinutes();
+
+    return slotStart <= currentMinutes;
   };
 
+  /*
+   * Check whether selected slot overlaps
+   * an existing pending/confirmed booking.
+   */
   const isSlotBooked = (slot) => {
     const slotStart = convertToMinutes(slot);
+
+    if (slotStart < 0) {
+      return false;
+    }
+
     const slotEnd = slotStart + 60;
 
-    return bookedSlots.some((booking) => {
+    return bookings.some((booking) => {
       const bookingStart = convertToMinutes(
         normalizeTime(booking?.startTime)
       );
@@ -483,6 +597,10 @@ const BookingSection = () => {
   };
 
   const getSlotStatus = (slot) => {
+    if (!isWithinOperatingHours(slot)) {
+      return "closed";
+    }
+
     if (isSlotBooked(slot)) {
       return "booked";
     }
@@ -504,7 +622,7 @@ const BookingSection = () => {
 
   const bookingUrl = bookingReady
     ? `/booking/${encodeURIComponent(
-        turfIdValue
+        turfId
       )}?date=${encodeURIComponent(
         selectedDate
       )}&slot=${encodeURIComponent(
@@ -518,7 +636,7 @@ const BookingSection = () => {
         <div className="mx-auto max-w-7xl px-4 py-5 sm:px-6 lg:px-8">
           <Link
             to={`/turfs/${encodeURIComponent(
-              turfIdValue
+              turfId
             )}`}
             className="inline-flex items-center gap-2 text-sm font-medium text-gray-500 transition hover:text-green-600"
           >
@@ -530,6 +648,7 @@ const BookingSection = () => {
 
       <section className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 lg:py-10">
         <div className="grid gap-8 lg:grid-cols-[1fr_420px]">
+          {/* Turf information */}
           <div>
             <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white">
               <div className="relative h-64 sm:h-80">
@@ -597,9 +716,9 @@ const BookingSection = () => {
                 </h2>
 
                 <p className="mt-3 text-sm leading-7 text-gray-500">
-                  Select your preferred date
-                  and available time slot to
-                  reserve this turf.
+                  Select your preferred date and
+                  available time slot to reserve
+                  this turf.
                 </p>
 
                 <div className="mt-7 grid gap-4 sm:grid-cols-3">
@@ -641,6 +760,7 @@ const BookingSection = () => {
             </div>
           </div>
 
+          {/* Booking panel */}
           <aside className="h-fit rounded-2xl border border-gray-200 bg-white p-5 shadow-sm sm:p-6 lg:sticky lg:top-24">
             <div className="flex items-center gap-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-green-50 text-green-600">
@@ -658,6 +778,7 @@ const BookingSection = () => {
               </div>
             </div>
 
+            {/* Date */}
             <div className="mt-6">
               <label
                 htmlFor="booking-date"
@@ -678,9 +799,10 @@ const BookingSection = () => {
                   value={selectedDate}
                   min={today}
                   onChange={(event) => {
-                    setSelectedDate(
-                      event.target.value
-                    );
+                    const value =
+                      event.target.value;
+
+                    setSelectedDate(value);
                     setSelectedSlot("");
                     setAvailabilityError("");
                   }}
@@ -689,6 +811,7 @@ const BookingSection = () => {
               </div>
             </div>
 
+            {/* Time slots */}
             <div className="mt-6">
               <div className="flex items-center justify-between gap-3">
                 <label className="text-sm font-medium text-gray-900">
@@ -740,11 +863,11 @@ const BookingSection = () => {
 
                   <button
                     type="button"
-                    onClick={() => {
-                      setSelectedDate(
-                        (current) => current
-                      );
-                    }}
+                    onClick={() =>
+                      setRetryKey(
+                        (current) => current + 1
+                      )
+                    }
                     className="mt-3 inline-flex items-center gap-1.5 text-xs font-semibold text-red-600 hover:text-red-700"
                   >
                     <RefreshCw size={13} />
@@ -783,6 +906,9 @@ const BookingSection = () => {
                               : status ===
                                 "past"
                               ? "cursor-not-allowed border-gray-100 bg-gray-50 text-gray-300"
+                              : status ===
+                                "closed"
+                              ? "cursor-not-allowed border-gray-100 bg-gray-50 text-gray-300"
                               : "border-gray-200 bg-white text-gray-600 hover:border-green-400 hover:bg-green-50 hover:text-green-700"
                           }`}
                         >
@@ -793,14 +919,20 @@ const BookingSection = () => {
                             <span className="text-[10px]">
                               Booked
                             </span>
+                          ) : status ===
+                            "closed" ? (
+                            <span className="text-[10px]">
+                              Closed
+                            </span>
                           ) : (
                             <Clock size={13} />
                           )}
 
-                          {status ===
-                          "booked"
-                            ? ""
-                            : slot}
+                          {status !==
+                            "booked" &&
+                            status !==
+                              "closed" &&
+                            slot}
                         </button>
                       );
                     })}
@@ -828,6 +960,7 @@ const BookingSection = () => {
               )}
             </div>
 
+            {/* Summary */}
             {bookingReady && (
               <div className="mt-6 rounded-xl bg-gray-50 p-4">
                 <h3 className="text-sm font-semibold text-gray-900">
@@ -863,7 +996,7 @@ const BookingSection = () => {
                     <div className="flex items-end justify-between">
                       <div>
                         <p className="text-xs text-gray-500">
-                          Total price
+                          Turf price
                         </p>
 
                         <p className="mt-1 text-xl font-bold text-gray-900">
@@ -883,6 +1016,7 @@ const BookingSection = () => {
               </div>
             )}
 
+            {/* Continue */}
             {bookingReady ? (
               <Link
                 to={bookingUrl}

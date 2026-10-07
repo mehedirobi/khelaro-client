@@ -1,42 +1,32 @@
-import { useContext, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   CalendarDays,
   Clock3,
-  Wallet,
-  Trophy,
-  ArrowRight,
-  ArrowLeft,
   MapPin,
-  CheckCircle2,
+  Search,
+  X,
+  Eye,
   Loader2,
-  CreditCard,
-  RefreshCw,
+  ArrowLeft,
+  Globe,
 } from "lucide-react";
 import { Link } from "react-router-dom";
-import { AuthContext } from "../contexts/AuthProvider";
+import useAuth from "../hooks/useAuth";
 
-const API_URL = (
-  import.meta.env.VITE_API_URL || "http://localhost:3000"
-).replace(/\/$/, "");
+const API_URL = import.meta.env.VITE_API_URL;
 
-const DashboardOverview = () => {
-  const { currentUser } = useContext(AuthContext);
+const MyBookings = () => {
+  const { currentUser } = useAuth();
 
+  const [activeTab, setActiveTab] = useState("All");
+  const [search, setSearch] = useState("");
   const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  // ==========================================
-  // FETCH USER BOOKINGS
-  // ==========================================
-
   useEffect(() => {
-    const controller = new AbortController();
-
-    const fetchUserBookings = async () => {
-      const userEmail = currentUser?.email?.trim().toLowerCase();
-
-      if (!userEmail) {
+    const fetchMyBookings = async () => {
+      if (!currentUser?.email) {
         setBookings([]);
         setLoading(false);
         return;
@@ -46,240 +36,59 @@ const DashboardOverview = () => {
         setLoading(true);
         setError("");
 
-        const endpoint = `${API_URL}/bookings/user/${encodeURIComponent(
-          userEmail
-        )}`;
+        const email = encodeURIComponent(
+          currentUser.email.trim().toLowerCase(),
+        );
 
-        console.log("Loading user bookings:", endpoint);
+        const response = await fetch(
+          `${API_URL}/bookings/user/${email}`,
+        );
 
-        const response = await fetch(endpoint, {
-          method: "GET",
-          signal: controller.signal,
-          headers: {
-            Accept: "application/json",
-          },
-        });
+        const data = await response.json();
 
-        const data = await response.json().catch(() => ({}));
-
-        console.log("User bookings response:", data);
+        console.log("My bookings API response:", data);
 
         if (!response.ok) {
           throw new Error(
             data?.message ||
-              data?.error ||
-              "Failed to fetch your bookings."
+              "Failed to fetch bookings",
           );
         }
 
-        // Supports:
-        // []
-        // { bookings: [] }
-        // { data: [] }
-        // { data: { bookings: [] } }
+        const bookingList = Array.isArray(
+          data?.bookings,
+        )
+          ? data.bookings
+          : [];
 
-        let bookingList = [];
-
-        if (Array.isArray(data)) {
-          bookingList = data;
-        } else if (Array.isArray(data?.bookings)) {
-          bookingList = data.bookings;
-        } else if (Array.isArray(data?.data)) {
-          bookingList = data.data;
-        } else if (Array.isArray(data?.data?.bookings)) {
-          bookingList = data.data.bookings;
-        }
-
-        // Normalize booking data
-        const normalizedBookings = bookingList
-          .filter(
-            (booking) =>
-              booking &&
-              typeof booking === "object"
-          )
-          .map((booking) => ({
-            ...booking,
-            _id:
-              booking._id ||
-              booking.id ||
-              booking.bookingId ||
-              null,
-
-            userEmail:
-              booking.userEmail ||
-              booking.email ||
-              "",
-
-            turfName:
-              booking.turfName ||
-              booking.turf?.name ||
-              booking.name ||
-              "Turf Booking",
-
-            location:
-              booking.location ||
-              booking.turfLocation ||
-              booking.turf?.location ||
-              booking.area ||
-              "Dhaka",
-
-            date: booking.date || "",
-
-            startTime:
-              booking.startTime ||
-              booking.start ||
-              "",
-
-            endTime:
-              booking.endTime ||
-              booking.end ||
-              "",
-
-            price:
-              Number(
-                booking.price ??
-                  booking.totalPrice ??
-                  booking.amount ??
-                  0
-              ) || 0,
-
-            status: String(
-              booking.status || "pending"
-            ).toLowerCase(),
-
-            paymentStatus: String(
-              booking.paymentStatus ||
-                "unpaid"
-            ).toLowerCase(),
-          }))
-          .sort((a, b) => {
-            const dateA = new Date(
-              `${a.date || ""}T${a.startTime || "00:00"}`
-            ).getTime();
-
-            const dateB = new Date(
-              `${b.date || ""}T${b.startTime || "00:00"}`
-            ).getTime();
-
-            return dateB - dateA;
-          });
-
-        setBookings(normalizedBookings);
-      } catch (err) {
-        if (err?.name === "AbortError") {
-          return;
-        }
-
+        setBookings(bookingList);
+      } catch (error) {
         console.error(
-          "Dashboard booking fetch error:",
-          err
+          "My bookings error:",
+          error,
+        );
+
+        setError(
+          error?.message ||
+            "Failed to load your bookings.",
         );
 
         setBookings([]);
-
-        setError(
-          err?.message ||
-            "Failed to load your bookings."
-        );
       } finally {
-        if (!controller.signal.aborted) {
-          setLoading(false);
-        }
+        setLoading(false);
       }
     };
 
-    fetchUserBookings();
-
-    return () => {
-      controller.abort();
-    };
+    fetchMyBookings();
   }, [currentUser?.email]);
 
-  // ==========================================
-  // BOOKING STATISTICS
-  // ==========================================
-
-  const stats = useMemo(() => {
-    const totalBookings = bookings.length;
-
-    const upcomingBookings = bookings.filter(
-      (booking) =>
-        booking.status === "pending" ||
-        booking.status === "confirmed"
-    );
-
-    const completedBookings = bookings.filter(
-      (booking) =>
-        booking.status === "completed"
-    );
-
-    const totalSpent = bookings.reduce(
-      (total, booking) => {
-        const isPaid =
-          booking.paymentStatus === "paid";
-
-        if (!isPaid) {
-          return total;
-        }
-
-        return total + (Number(booking.price) || 0);
-      },
-      0
-    );
-
-    return [
-      {
-        title: "Total Bookings",
-        value: totalBookings,
-        description: "All time bookings",
-        icon: CalendarDays,
-      },
-      {
-        title: "Upcoming Games",
-        value: upcomingBookings.length,
-        description: "Games scheduled",
-        icon: Clock3,
-      },
-      {
-        title: "Completed",
-        value: completedBookings.length,
-        description: "Games played",
-        icon: Trophy,
-      },
-      {
-        title: "Total Spent",
-        value: `৳${totalSpent.toLocaleString(
-          "en-BD"
-        )}`,
-        description: "Paid turf bookings",
-        icon: Wallet,
-      },
-    ];
-  }, [bookings]);
-
-  // ==========================================
-  // RECENT BOOKINGS
-  // ==========================================
-
-  const recentBookings = useMemo(() => {
-    return bookings.slice(0, 3);
-  }, [bookings]);
-
-  // ==========================================
-  // FORMAT DATE
-  // ==========================================
-
   const formatDate = (date) => {
-    if (!date) {
-      return "Date unavailable";
-    }
+    if (!date) return "N/A";
 
-    const parsedDate = new Date(
-      `${date}T00:00:00`
-    );
+    const parsedDate = new Date(date);
 
     if (Number.isNaN(parsedDate.getTime())) {
-      return date;
+      return String(date);
     }
 
     return parsedDate.toLocaleDateString(
@@ -288,115 +97,143 @@ const DashboardOverview = () => {
         day: "2-digit",
         month: "short",
         year: "numeric",
-      }
+      },
     );
   };
 
-  // ==========================================
-  // STATUS LABEL
-  // ==========================================
+  const formatTime = (time) => {
+    if (!time) return "N/A";
 
-  const getStatusLabel = (status) => {
-    if (!status) {
-      return "Unknown";
+    const [hours, minutes] =
+      String(time).split(":");
+
+    if (
+      hours === undefined ||
+      minutes === undefined
+    ) {
+      return String(time);
     }
 
-    return (
-      status.charAt(0).toUpperCase() +
-      status.slice(1)
+    const date = new Date();
+
+    date.setHours(
+      Number(hours),
+      Number(minutes),
+      0,
+      0,
+    );
+
+    return date.toLocaleTimeString(
+      "en-US",
+      {
+        hour: "2-digit",
+        minute: "2-digit",
+      },
     );
   };
 
-  // ==========================================
-  // STATUS STYLE
-  // ==========================================
+  const getDisplayStatus = (booking) => {
+    const status = String(
+      booking?.status || "",
+    ).toLowerCase();
+
+    if (
+      status === "cancelled" ||
+      status === "canceled"
+    ) {
+      return "Cancelled";
+    }
+
+    if (status === "completed") {
+      return "Completed";
+    }
+
+    if (booking?.date) {
+      const bookingDate = new Date(
+        `${booking.date}T00:00:00`,
+      );
+
+      const today = new Date();
+
+      bookingDate.setHours(0, 0, 0, 0);
+      today.setHours(0, 0, 0, 0);
+
+      if (
+        !Number.isNaN(
+          bookingDate.getTime(),
+        ) &&
+        bookingDate < today
+      ) {
+        return "Completed";
+      }
+    }
+
+    return "Upcoming";
+  };
+
+  const filteredBookings = useMemo(() => {
+    const searchText =
+      search.trim().toLowerCase();
+
+    return bookings.filter((booking) => {
+      const displayStatus =
+        getDisplayStatus(booking);
+
+      const matchesTab =
+        activeTab === "All" ||
+        displayStatus === activeTab;
+
+      if (!searchText) {
+        return matchesTab;
+      }
+
+      const searchableText = [
+        booking?.bookingId,
+        booking?.turfName,
+        booking?.turfLocation,
+        booking?.location,
+        booking?.ownerEmail,
+        booking?.status,
+        booking?.paymentStatus,
+        booking?.date,
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+
+      return (
+        matchesTab &&
+        searchableText.includes(
+          searchText,
+        )
+      );
+    });
+  }, [bookings, activeTab, search]);
 
   const getStatusStyle = (status) => {
-    switch (status) {
-      case "confirmed":
-        return "bg-green-50 text-green-600";
-
-      case "pending":
-        return "bg-yellow-50 text-yellow-600";
-
-      case "cancelled":
-        return "bg-red-50 text-red-600";
-
-      case "completed":
-        return "bg-blue-50 text-blue-600";
-
-      case "rejected":
-        return "bg-red-50 text-red-600";
-
-      default:
-        return "bg-gray-50 text-gray-600";
+    if (status === "Upcoming") {
+      return "bg-blue-50 text-blue-600";
     }
-  };
 
-  // ==========================================
-  // PAYMENT STYLE
-  // ==========================================
-
-  const getPaymentStyle = (paymentStatus) => {
-    switch (paymentStatus) {
-      case "paid":
-        return "bg-green-50 text-green-600";
-
-      case "unpaid":
-        return "bg-yellow-50 text-yellow-600";
-
-      case "failed":
-        return "bg-red-50 text-red-600";
-
-      case "refunded":
-        return "bg-purple-50 text-purple-600";
-
-      default:
-        return "bg-gray-50 text-gray-500";
+    if (status === "Completed") {
+      return "bg-green-50 text-green-600";
     }
-  };
 
-  // ==========================================
-  // USER NAME
-  // ==========================================
-
-  const userName =
-    currentUser?.displayName ||
-    currentUser?.name ||
-    currentUser?.email?.split("@")[0] ||
-    "User";
-
-  // ==========================================
-  // REFRESH
-  // ==========================================
-
-  const handleRefresh = () => {
-    window.location.reload();
+    return "bg-red-50 text-red-600";
   };
 
   return (
     <main>
-      {/* ==========================================
-          HEADER
-      ========================================== */}
-
+      {/* Header */}
       <div>
         <Link
           to="/turfs"
           className="
-            inline-flex
-            h-11
-            items-center
-            justify-center
-            gap-2
-            rounded-xl
-            bg-green-600
-            px-5
-            text-sm
-            font-semibold
-            text-white
-            transition-all
-            duration-200
+            inline-flex h-11 items-center
+            justify-center gap-2 rounded-xl
+            bg-green-600 px-5
+            text-sm font-semibold text-white
+            transition-all duration-200
             hover:bg-green-700
             hover:shadow-lg
             hover:shadow-green-600/20
@@ -411,529 +248,322 @@ const DashboardOverview = () => {
             Dashboard
           </p>
 
-          <div className="mt-1 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900 sm:text-3xl">
-                Welcome back, {userName}
-              </h1>
+          <h1 className="mt-1 text-2xl font-bold text-gray-900 sm:text-3xl">
+            My Bookings
+          </h1>
 
-              <p className="mt-2 text-sm text-gray-500">
-                Here is an overview of your turf
-                bookings and activities.
-              </p>
-            </div>
-
-            <button
-              type="button"
-              onClick={handleRefresh}
-              className="
-                inline-flex
-                h-10
-                w-fit
-                items-center
-                justify-center
-                gap-2
-                rounded-xl
-                border
-                border-gray-200
-                bg-white
-                px-4
-                text-sm
-                font-medium
-                text-gray-600
-                transition
-                hover:border-green-300
-                hover:text-green-600
-              "
-            >
-              <RefreshCw size={16} />
-              Refresh
-            </button>
-          </div>
+          <p className="mt-2 text-sm text-gray-500">
+            Manage and track all your turf reservations.
+          </p>
         </div>
       </div>
 
-      {/* ==========================================
-          STATS
-      ========================================== */}
-
-      <section className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {stats.map((stat) => {
-          const Icon = stat.icon;
-
-          return (
-            <div
-              key={stat.title}
-              className="
-                rounded-2xl
-                border
-                border-gray-200
-                bg-white
-                p-5
-                transition-all
-                duration-200
-                hover:border-gray-300
-                hover:shadow-sm
-              "
+      {/* Filters */}
+      <div className="mt-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-wrap gap-2">
+          {[
+            "All",
+            "Upcoming",
+            "Completed",
+            "Cancelled",
+          ].map((tab) => (
+            <button
+              key={tab}
+              type="button"
+              onClick={() =>
+                setActiveTab(tab)
+              }
+              className={`rounded-lg px-4 py-2 text-sm font-medium transition ${
+                activeTab === tab
+                  ? "bg-green-600 text-white"
+                  : "bg-white text-gray-500 hover:bg-gray-100"
+              }`}
             >
-              <div className="flex items-start justify-between">
-                <div>
-                  <p className="text-sm text-gray-500">
-                    {stat.title}
-                  </p>
+              {tab}
+            </button>
+          ))}
+        </div>
 
-                  <h2 className="mt-2 text-2xl font-bold text-gray-900">
-                    {loading ? "—" : stat.value}
-                  </h2>
-                </div>
+        <div className="relative w-full sm:w-72">
+          <Search
+            size={17}
+            className="
+              absolute left-3 top-1/2
+              -translate-y-1/2
+              text-gray-400
+            "
+          />
 
-                <div
+          <input
+            type="text"
+            value={search}
+            onChange={(e) =>
+              setSearch(e.target.value)
+            }
+            placeholder="Search bookings..."
+            className="
+              h-11 w-full rounded-xl
+              border border-gray-200
+              bg-white pl-10 pr-10
+              text-sm outline-none
+              transition
+              focus:border-green-500
+              focus:ring-4
+              focus:ring-green-500/10
+            "
+          />
+
+          {search && (
+            <button
+              type="button"
+              onClick={() => setSearch("")}
+              className="
+                absolute right-3 top-1/2
+                -translate-y-1/2
+                text-gray-400
+                transition
+                hover:text-gray-600
+              "
+              aria-label="Clear search"
+            >
+              <X size={16} />
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Loading */}
+      {loading && (
+        <div className="mt-10 flex flex-col items-center justify-center py-16">
+          <Loader2
+            size={32}
+            className="animate-spin text-green-600"
+          />
+
+          <p className="mt-4 text-sm text-gray-500">
+            Loading your bookings...
+          </p>
+        </div>
+      )}
+
+      {/* Error */}
+      {!loading && error && (
+        <div className="mt-6 rounded-2xl border border-red-100 bg-red-50 p-6 text-center">
+          <p className="text-sm font-medium text-red-600">
+            {error}
+          </p>
+
+          <p className="mt-2 text-xs text-red-500">
+            Check the browser console for the API response.
+          </p>
+        </div>
+      )}
+
+      {/* Bookings */}
+      {!loading && !error && (
+        <div className="mt-6 space-y-4">
+          {filteredBookings.length > 0 ? (
+            filteredBookings.map((booking) => {
+              const displayStatus =
+                getDisplayStatus(
+                  booking,
+                );
+
+              const location =
+                booking?.turfLocation ||
+                booking?.location ||
+                "";
+
+              return (
+                <article
+                  key={
+                    booking?._id ||
+                    booking?.bookingId ||
+                    booking?.id
+                  }
                   className="
-                    flex
-                    h-11
-                    w-11
-                    items-center
-                    justify-center
-                    rounded-xl
-                    bg-green-50
-                    text-green-600
+                    rounded-2xl
+                    border border-gray-200
+                    bg-white p-5
+                    transition
+                    hover:border-gray-300
+                    sm:p-6
                   "
                 >
-                  <Icon size={21} />
-                </div>
-              </div>
+                  <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+                    <div>
+                      <div className="flex flex-wrap items-center gap-3">
+                        <span
+                          className={`rounded-full px-3 py-1 text-xs font-semibold ${getStatusStyle(
+                            displayStatus,
+                          )}`}
+                        >
+                          {displayStatus}
+                        </span>
 
-              <p className="mt-4 text-xs text-gray-400">
-                {stat.description}
-              </p>
-            </div>
-          );
-        })}
-      </section>
+                        <span className="text-xs text-gray-400">
+                          {booking?.bookingId
+                            ? `KHL-${String(
+                                booking.bookingId,
+                              )
+                                .slice(-6)
+                                .toUpperCase()}`
+                            : booking?._id
+                              ? `KHL-${String(
+                                  booking._id,
+                                )
+                                  .slice(-6)
+                                  .toUpperCase()}`
+                              : "Booking"}
+                        </span>
+                      </div>
 
-      {/* ==========================================
-          MAIN CONTENT
-      ========================================== */}
+                      <h2 className="mt-3 text-lg font-bold text-gray-900">
+                        {booking?.turfName ||
+                          "Turf"}
+                      </h2>
 
-      <section className="mt-8 grid gap-6 xl:grid-cols-[1.5fr_1fr]">
-        {/* ==========================================
-            RECENT BOOKINGS
-        ========================================== */}
+                      <div className="mt-3 flex flex-wrap gap-x-5 gap-y-3 text-sm text-gray-500">
+                        {location && (
+                          <span className="flex items-center gap-1.5">
+                            <MapPin size={16} />
+                            {location}
+                          </span>
+                        )}
 
-        <div className="rounded-2xl border border-gray-200 bg-white">
-          <div
-            className="
-              flex
-              items-center
-              justify-between
-              border-b
-              border-gray-100
-              p-5
-            "
-          >
-            <div>
-              <h2 className="font-semibold text-gray-900">
-                Recent Bookings
-              </h2>
+                        <span className="flex items-center gap-1.5">
+                          <CalendarDays
+                            size={16}
+                          />
 
-              <p className="mt-1 text-xs text-gray-500">
-                Your latest turf reservations
-              </p>
-            </div>
+                          {formatDate(
+                            booking?.date,
+                          )}
+                        </span>
 
-            <Link
-              to="/dashboard/bookings"
-              className="
-                text-sm
-                font-medium
-                text-green-600
-                transition-colors
-                hover:text-green-700
-              "
-            >
-              View all
-            </Link>
-          </div>
+                        <span className="flex items-center gap-1.5">
+                          <Clock3 size={16} />
 
-          {/* Loading */}
+                          {formatTime(
+                            booking?.startTime,
+                          )}
 
-          {loading && (
-            <div className="p-8 text-center">
-              <Loader2
-                size={28}
-                className="mx-auto animate-spin text-green-600"
+                          {" - "}
+
+                          {formatTime(
+                            booking?.endTime,
+                          )}
+                        </span>
+                      </div>
+
+                      <div className="mt-4 flex flex-wrap gap-4">
+                        <span
+                          className={`text-xs font-medium ${
+                            String(
+                              booking?.paymentStatus ||
+                                "",
+                            ).toLowerCase() ===
+                            "paid"
+                              ? "text-green-600"
+                              : "text-orange-500"
+                          }`}
+                        >
+                          Payment:{" "}
+                          {booking?.paymentStatus ||
+                            "Unpaid"}
+                        </span>
+
+                        {booking?.ownerEmail && (
+                          <span className="text-xs text-gray-400">
+                            Owner:{" "}
+                            {
+                              booking.ownerEmail
+                            }
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between gap-5 lg:block lg:text-right">
+                      <div>
+                        <p className="text-xs text-gray-400">
+                          Total Amount
+                        </p>
+
+                        <p className="mt-1 text-xl font-bold text-gray-900">
+                          ৳
+                          {Number(
+                            booking?.price ||
+                              0,
+                          ).toLocaleString()}
+                        </p>
+                      </div>
+
+                      <button
+                        type="button"
+                        className="
+                          mt-3 inline-flex
+                          items-center gap-2
+                          rounded-lg
+                          border border-gray-200
+                          px-4 py-2
+                          text-sm font-medium
+                          text-gray-700
+                          transition
+                          hover:border-green-500
+                          hover:text-green-600
+                        "
+                      >
+                        <Eye size={16} />
+                        Details
+                      </button>
+                    </div>
+                  </div>
+                </article>
+              );
+            })
+          ) : (
+            <div className="rounded-2xl border border-gray-200 bg-white py-16 text-center">
+              <CalendarDays
+                size={32}
+                className="mx-auto text-gray-300"
               />
 
-              <p className="mt-3 text-sm text-gray-500">
-                Loading your bookings...
-              </p>
-            </div>
-          )}
+              <h2 className="mt-4 font-semibold text-gray-900">
+                No bookings found
+              </h2>
 
-          {/* Error */}
-
-          {!loading && error && (
-            <div className="p-8 text-center">
-              <p className="text-sm font-medium text-red-600">
-                {error}
+              <p className="mt-2 text-sm text-gray-500">
+                {bookings.length === 0
+                  ? "You haven't booked any turf yet."
+                  : "Try changing your filters or search."}
               </p>
 
-              <button
-                type="button"
-                onClick={handleRefresh}
-                className="
-                  mt-4
-                  inline-flex
-                  items-center
-                  gap-2
-                  rounded-xl
-                  bg-gray-900
-                  px-4
-                  py-2.5
-                  text-sm
-                  font-semibold
-                  text-white
-                  transition
-                  hover:bg-gray-800
-                "
-              >
-                <RefreshCw size={15} />
-                Try again
-              </button>
-            </div>
-          )}
-
-          {/* Empty */}
-
-          {!loading &&
-            !error &&
-            recentBookings.length === 0 && (
-              <div className="p-8 text-center">
-                <div
-                  className="
-                    mx-auto
-                    flex
-                    h-12
-                    w-12
-                    items-center
-                    justify-center
-                    rounded-xl
-                    bg-green-50
-                    text-green-600
-                  "
-                >
-                  <CalendarDays size={22} />
-                </div>
-
-                <h3 className="mt-4 font-semibold text-gray-900">
-                  No bookings yet
-                </h3>
-
-                <p className="mt-2 text-sm text-gray-500">
-                  You have not booked any turf yet.
-                </p>
-
+              {bookings.length === 0 && (
                 <Link
                   to="/turfs"
                   className="
-                    mt-5
-                    inline-flex
-                    items-center
-                    gap-2
+                    mt-5 inline-flex
+                    items-center gap-2
                     rounded-xl
                     bg-green-600
-                    px-4
-                    py-2.5
-                    text-sm
-                    font-semibold
+                    px-4 py-2.5
+                    text-sm font-semibold
                     text-white
                     transition
                     hover:bg-green-700
                   "
                 >
+                  <Globe size={16} />
                   Find a Turf
-                  <ArrowRight size={16} />
                 </Link>
-              </div>
-            )}
-
-          {/* Bookings */}
-
-          {!loading &&
-            !error &&
-            recentBookings.length > 0 && (
-              <div className="divide-y divide-gray-100">
-                {recentBookings.map(
-                  (booking, index) => {
-                    const bookingKey =
-                      booking._id ||
-                      booking.id ||
-                      booking.bookingId ||
-                      `booking-${index}`;
-
-                    const bookingPrice =
-                      Number(
-                        booking.price
-                      ) || 0;
-
-                    return (
-                      <div
-                        key={bookingKey}
-                        className="p-5"
-                      >
-                        <div
-                          className="
-                            flex
-                            flex-col
-                            gap-4
-                            sm:flex-row
-                            sm:items-center
-                            sm:justify-between
-                          "
-                        >
-                          {/* Booking Information */}
-
-                          <div className="min-w-0">
-                            <div className="flex flex-wrap items-center gap-2">
-                              <h3 className="font-semibold text-gray-900">
-                                {booking.turfName}
-                              </h3>
-
-                              <span
-                                className={`
-                                  rounded-full
-                                  px-2.5
-                                  py-1
-                                  text-[11px]
-                                  font-semibold
-                                  ${getStatusStyle(
-                                    booking.status
-                                  )}
-                                `}
-                              >
-                                {getStatusLabel(
-                                  booking.status
-                                )}
-                              </span>
-                            </div>
-
-                            <div
-                              className="
-                                mt-2
-                                flex
-                                flex-wrap
-                                gap-x-4
-                                gap-y-2
-                                text-xs
-                                text-gray-500
-                              "
-                            >
-                              <span className="flex items-center gap-1">
-                                <MapPin
-                                  size={14}
-                                />
-
-                                {booking.location}
-                              </span>
-
-                              <span className="flex items-center gap-1">
-                                <CalendarDays
-                                  size={14}
-                                />
-
-                                {formatDate(
-                                  booking.date
-                                )}
-                              </span>
-
-                              <span className="flex items-center gap-1">
-                                <Clock3
-                                  size={14}
-                                />
-
-                                {booking.startTime ||
-                                  "--:--"}{" "}
-                                -{" "}
-                                {booking.endTime ||
-                                  "--:--"}
-                              </span>
-                            </div>
-
-                            {/* Payment */}
-
-                            <div className="mt-3">
-                              <span
-                                className={`
-                                  inline-flex
-                                  items-center
-                                  gap-1.5
-                                  rounded-full
-                                  px-2.5
-                                  py-1
-                                  text-[11px]
-                                  font-semibold
-                                  ${getPaymentStyle(
-                                    booking.paymentStatus
-                                  )}
-                                `}
-                              >
-                                <CreditCard
-                                  size={12}
-                                />
-
-                                {booking.paymentStatus ===
-                                "paid"
-                                  ? "Payment Paid"
-                                  : booking.paymentStatus ===
-                                    "failed"
-                                  ? "Payment Failed"
-                                  : booking.paymentStatus ===
-                                    "refunded"
-                                  ? "Refunded"
-                                  : "Payment Pending"}
-                              </span>
-                            </div>
-                          </div>
-
-                          {/* Price */}
-
-                          <div
-                            className="
-                              flex
-                              items-center
-                              justify-between
-                              gap-4
-                              sm:block
-                              sm:shrink-0
-                              sm:text-right
-                            "
-                          >
-                            <div>
-                              <p className="text-xs text-gray-400">
-                                Total
-                              </p>
-
-                              <p className="mt-1 font-bold text-gray-900">
-                                ৳
-                                {bookingPrice.toLocaleString(
-                                  "en-BD"
-                                )}
-                              </p>
-                            </div>
-
-                            <p className="mt-1 text-xs text-gray-400">
-                              {booking._id
-                                ? `KHL-${String(
-                                    booking._id
-                                  )
-                                    .slice(-6)
-                                    .toUpperCase()}`
-                                : "Booking"}
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  }
-                )}
-              </div>
-            )}
-        </div>
-
-        {/* ==========================================
-            QUICK ACTIONS
-        ========================================== */}
-
-        <div className="space-y-6">
-          <div className="rounded-2xl bg-gray-900 p-6 text-white">
-            <div
-              className="
-                flex
-                h-12
-                w-12
-                items-center
-                justify-center
-                rounded-xl
-                bg-white/10
-              "
-            >
-              <CalendarDays size={22} />
+              )}
             </div>
-
-            <h2 className="mt-5 text-xl font-bold">
-              Ready to play?
-            </h2>
-
-            <p className="mt-2 text-sm leading-6 text-gray-300">
-              Find and book the perfect turf for
-              your next game.
-            </p>
-
-            <Link
-              to="/turfs"
-              className="
-                mt-6
-                inline-flex
-                items-center
-                gap-2
-                text-sm
-                font-semibold
-                text-green-400
-                transition-colors
-                hover:text-green-300
-              "
-            >
-              Explore Turfs
-              <ArrowRight size={17} />
-            </Link>
-          </div>
-
-          <div
-            className="
-              rounded-2xl
-              border
-              border-gray-200
-              bg-white
-              p-6
-            "
-          >
-            <div className="flex items-center gap-3">
-              <div
-                className="
-                  flex
-                  h-11
-                  w-11
-                  items-center
-                  justify-center
-                  rounded-xl
-                  bg-green-50
-                  text-green-600
-                "
-              >
-                <CheckCircle2 size={21} />
-              </div>
-
-              <div>
-                <h3 className="font-semibold text-gray-900">
-                  Booking Tip
-                </h3>
-
-                <p className="mt-1 text-xs text-gray-500">
-                  Plan ahead for better availability.
-                </p>
-              </div>
-            </div>
-
-            <p className="mt-4 text-sm leading-6 text-gray-500">
-              Weekend and evening slots are usually
-              booked faster. Reserve your preferred
-              time early.
-            </p>
-          </div>
+          )}
         </div>
-      </section>
+      )}
     </main>
   );
 };
 
-export default DashboardOverview;
+export default MyBookings;

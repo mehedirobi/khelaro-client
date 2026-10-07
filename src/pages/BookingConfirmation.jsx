@@ -65,7 +65,11 @@ const BookingConfirmation = () => {
 
         const turfData = data?.turf || data?.data || data;
 
-        if (!turfData || typeof turfData !== "object") {
+        if (
+          !turfData ||
+          typeof turfData !== "object" ||
+          Array.isArray(turfData)
+        ) {
           throw new Error("Invalid turf data received.");
         }
 
@@ -132,7 +136,8 @@ const BookingConfirmation = () => {
           </h1>
 
           <p className="mt-3 text-sm leading-6 text-gray-500">
-            {error || "The requested turf could not be found."}
+            {error ||
+              "The requested turf could not be found."}
           </p>
 
           <div className="mt-6 flex flex-col justify-center gap-3 sm:flex-row">
@@ -158,20 +163,28 @@ const BookingConfirmation = () => {
     );
   }
 
-  if (!date || !slot) {
-    const turfId = String(
-      turf._id || turf.id || id
-    );
+  const turfId = String(
+    turf._id || turf.id || id || ""
+  ).trim();
 
+  if (!date || !slot) {
     return (
       <main className="flex min-h-[70vh] items-center justify-center bg-gray-50 px-4">
         <div className="max-w-md rounded-2xl bg-white p-8 text-center shadow-sm">
-          <h1 className="text-2xl font-bold text-gray-900">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-yellow-50">
+            <CalendarDays
+              size={26}
+              className="text-yellow-600"
+            />
+          </div>
+
+          <h1 className="mt-5 text-2xl font-bold text-gray-900">
             Booking information missing
           </h1>
 
           <p className="mt-3 text-sm leading-6 text-gray-500">
-            Please select a date and time slot before continuing.
+            Please select a date and time slot before
+            continuing.
           </p>
 
           <Link
@@ -185,10 +198,6 @@ const BookingConfirmation = () => {
       </main>
     );
   }
-
-  const turfId = String(
-    turf._id || turf.id || id
-  ).trim();
 
   const turfName = String(
     turf.name || "Unnamed Turf"
@@ -210,12 +219,11 @@ const BookingConfirmation = () => {
     turf.sport || "Sports Turf"
   ).trim();
 
-  const turfPriceValue = Number(turf.price);
+  const priceValue = Number(turf.price);
 
   const turfPrice =
-    Number.isFinite(turfPriceValue) &&
-    turfPriceValue >= 0
-      ? turfPriceValue
+    Number.isFinite(priceValue) && priceValue >= 0
+      ? priceValue
       : 0;
 
   const serviceFee = 50;
@@ -234,6 +242,11 @@ const BookingConfirmation = () => {
     turfId
   )}/book`;
 
+  /*
+   * Keep the selected slot unchanged here.
+   * Payment.jsx will convert the display time
+   * into backend-compatible 24-hour values.
+   */
   const paymentUrl = `/payment/${encodeURIComponent(
     turfId
   )}?date=${encodeURIComponent(
@@ -280,8 +293,13 @@ const BookingConfirmation = () => {
                   alt={turfName}
                   className="h-full w-full object-cover"
                   onError={(event) => {
-                    event.currentTarget.src =
-                      FALLBACK_IMAGE;
+                    if (
+                      event.currentTarget.src !==
+                      FALLBACK_IMAGE
+                    ) {
+                      event.currentTarget.src =
+                        FALLBACK_IMAGE;
+                    }
                   }}
                 />
               </div>
@@ -302,7 +320,6 @@ const BookingConfirmation = () => {
                         size={16}
                         className="text-green-600"
                       />
-
                       {turfLocation}
                     </div>
                   </div>
@@ -404,7 +421,7 @@ const BookingConfirmation = () => {
                   </span>
 
                   <span className="font-medium text-gray-900">
-                    ৳{serviceFee}
+                    ৳{serviceFee.toLocaleString("en-BD")}
                   </span>
                 </div>
 

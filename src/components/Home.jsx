@@ -7,15 +7,19 @@ import FinalCTA from "../components/FinalCTA";
 
 const Home = () => {
   return (
-    <>
+    <main className="overflow-hidden">
       <Hero />
+
       <LocationSection />
-      
+
       <HowItWorks />
+
       <WhyKhelaro />
+
       <OwnerCTA />
+
       <FinalCTA />
-    </>
+    </main>
   );
 };
 

@@ -7,10 +7,11 @@ import {
   ArrowLeft,
   Loader2,
   RefreshCw,
+  Sparkles,
+  Trash2,
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import Swal from "sweetalert2";
-
 import useAuth from "../hooks/useAuth";
 
 const API_URL = (
@@ -66,13 +67,6 @@ const Wishlist = () => {
           );
         }
 
-        /*
-         * Backend may return:
-         *
-         * 1. Array directly
-         * 2. { wishlist: [...] }
-         * 3. { data: [...] }
-         */
         const wishlistItems = Array.isArray(data)
           ? data
           : Array.isArray(data?.wishlist)
@@ -81,12 +75,6 @@ const Wishlist = () => {
               ? data.data
               : [];
 
-        /*
-         * If backend already returns complete turf objects,
-         * use them directly.
-         *
-         * Otherwise, fetch each turf using its turfId.
-         */
         const normalizedItems = wishlistItems
           .map((item) => {
             const turfId = String(
@@ -98,25 +86,8 @@ const Wishlist = () => {
                 ""
             ).trim();
 
-            if (!turfId) {
-              return null;
-            }
+            if (!turfId) return null;
 
-            /*
-             * Backend may return:
-             * {
-             *   turfId,
-             *   name,
-             *   image,
-             *   location
-             * }
-             *
-             * or:
-             * {
-             *   turfId,
-             *   turf: {...}
-             * }
-             */
             const turfData =
               item?.turf &&
               typeof item.turf === "object"
@@ -157,22 +128,14 @@ const Wishlist = () => {
           })
           .filter(Boolean);
 
-        /*
-         * If the wishlist endpoint only returns IDs,
-         * load the actual turf information.
-         */
         const incompleteItems = normalizedItems.filter(
-          (item) =>
-            !item.name &&
-            item.turfId
+          (item) => !item.name && item.turfId
         );
 
         if (incompleteItems.length > 0) {
           const resolvedItems = await Promise.all(
             normalizedItems.map(async (item) => {
-              if (item.name) {
-                return item;
-              }
+              if (item.name) return item;
 
               try {
                 const turfResponse = await fetch(
@@ -185,9 +148,7 @@ const Wishlist = () => {
                   }
                 );
 
-                if (!turfResponse.ok) {
-                  return null;
-                }
+                if (!turfResponse.ok) return null;
 
                 const turfResponseData =
                   await turfResponse
@@ -209,61 +170,29 @@ const Wishlist = () => {
 
                 return {
                   ...item,
-
-                  name:
-                    turf.name ||
-                    "Unnamed Turf",
-
-                  image:
-                    turf.image ||
-                    "",
-
+                  name: turf.name || "Unnamed Turf",
+                  image: turf.image || "",
                   location:
                     turf.location ||
                     turf.area ||
                     "Dhaka, Bangladesh",
-
-                  area:
-                    turf.area ||
-                    "",
-
-                  sport:
-                    turf.sport ||
-                    "Sports Turf",
-
-                  surface:
-                    turf.surface ||
-                    "",
-
-                  size:
-                    turf.size ||
-                    "",
-
-                  price:
-                    turf.price ?? 0,
-
-                  rating:
-                    turf.rating ?? null,
-
-                  reviews:
-                    turf.reviews ?? 0,
-
-                  facilities:
-                    Array.isArray(
-                      turf.amenities
-                    )
-                      ? turf.amenities
-                      : Array.isArray(
-                            turf.features
-                          )
-                        ? turf.features
-                        : [],
+                  area: turf.area || "",
+                  sport: turf.sport || "Sports Turf",
+                  surface: turf.surface || "",
+                  size: turf.size || "",
+                  price: turf.price ?? 0,
+                  rating: turf.rating ?? null,
+                  reviews: turf.reviews ?? 0,
+                  facilities: Array.isArray(
+                    turf.amenities
+                  )
+                    ? turf.amenities
+                    : Array.isArray(turf.features)
+                      ? turf.features
+                      : [],
                 };
               } catch (error) {
-                if (
-                  error?.name ===
-                  "AbortError"
-                ) {
+                if (error?.name === "AbortError") {
                   throw error;
                 }
 
@@ -284,14 +213,9 @@ const Wishlist = () => {
           setWishlistTurfs(normalizedItems);
         }
       } catch (error) {
-        if (error?.name === "AbortError") {
-          return;
-        }
+        if (error?.name === "AbortError") return;
 
-        console.error(
-          "Wishlist fetch error:",
-          error
-        );
+        console.error("Wishlist fetch error:", error);
 
         setWishlistTurfs([]);
         setError(
@@ -313,9 +237,7 @@ const Wishlist = () => {
   }, [userEmail]);
 
   const handleRemove = async (turfId) => {
-    if (!userEmail || !turfId || removingId) {
-      return;
-    }
+    if (!userEmail || !turfId || removingId) return;
 
     try {
       setRemovingId(String(turfId));
@@ -323,8 +245,9 @@ const Wishlist = () => {
       const encodedEmail =
         encodeURIComponent(userEmail);
 
-      const encodedTurfId =
-        encodeURIComponent(String(turfId));
+      const encodedTurfId = encodeURIComponent(
+        String(turfId)
+      );
 
       const response = await fetch(
         `${API_URL}/wishlist/${encodedEmail}/${encodedTurfId}`,
@@ -397,319 +320,437 @@ const Wishlist = () => {
   };
 
   return (
-    <main className="min-h-screen">
+    <main className="min-h-screen bg-gray-50">
       {/* Header */}
-      <div>
-        <Link
-          to="/turfs"
-          className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-green-600 px-5 text-sm font-semibold text-white transition-all duration-200 hover:bg-green-700 hover:shadow-md hover:shadow-green-600/20"
-        >
-          <ArrowLeft size={16} />
-          Back to Turfs
-        </Link>
+      <section className="border-b border-gray-200 bg-white">
+        <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+          <div className="animate-in fade-in slide-in-from-bottom-3 duration-500">
+            <Link
+              to="/turfs"
+              className="group inline-flex items-center gap-2 text-sm font-medium text-gray-500 transition-colors duration-200 hover:text-green-600"
+            >
+              <ArrowLeft
+                size={17}
+                className="transition-transform duration-200 group-hover:-translate-x-1"
+              />
+              Back to Turfs
+            </Link>
 
-        <div className="mt-5">
-          <p className="text-sm font-medium text-green-600">
-            Dashboard
-          </p>
+            <div className="mt-7 flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
+              <div>
+                <div className="inline-flex items-center gap-2 rounded-full border border-green-100 bg-green-50 px-3 py-1.5 text-xs font-semibold text-green-700">
+                  <Heart
+                    size={13}
+                    fill="currentColor"
+                  />
+                  Saved Turfs
+                </div>
 
-          <h1 className="mt-1 text-2xl font-bold text-gray-900 sm:text-3xl">
-            Wishlist
-          </h1>
+                <h1 className="mt-4 text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl">
+                  Your Wishlist
+                </h1>
 
-          <p className="mt-2 text-sm text-gray-500">
-            Your saved turfs for future games.
-          </p>
+                <p className="mt-2 max-w-xl text-sm leading-6 text-gray-500 sm:text-base">
+                  Keep your favorite turfs saved so you
+                  can quickly find them when you're ready
+                  to play.
+                </p>
+              </div>
+
+              {!loading && !error && (
+                <div className="inline-flex w-fit items-center gap-2 rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm">
+                  <Sparkles
+                    size={16}
+                    className="text-green-600"
+                  />
+
+                  <span className="font-semibold text-gray-900">
+                    {wishlistTurfs.length}
+                  </span>
+
+                  <span className="text-gray-500">
+                    {wishlistTurfs.length === 1
+                      ? "saved turf"
+                      : "saved turfs"}
+                  </span>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
-      </div>
+      </section>
 
-      {/* Loading */}
-      {loading && (
-        <div className="mt-10 flex flex-col items-center justify-center py-16">
-          <Loader2
-            size={32}
-            className="animate-spin text-green-600"
-          />
+      {/* Content */}
+      <section className="mx-auto max-w-7xl px-4 py-8 sm:px-6 sm:py-10 lg:px-8">
+        {/* Loading */}
+        {loading && (
+          <div className="animate-in fade-in duration-500">
+            <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
+              {[1, 2, 3].map((item) => (
+                <div
+                  key={item}
+                  className="overflow-hidden rounded-2xl border border-gray-200 bg-white"
+                >
+                  <div className="aspect-[16/10] animate-pulse bg-gray-200" />
 
-          <p className="mt-4 text-sm text-gray-500">
-            Loading your wishlist...
-          </p>
-        </div>
-      )}
+                  <div className="space-y-4 p-5">
+                    <div className="h-3 w-20 animate-pulse rounded bg-gray-200" />
 
-      {/* Error */}
-      {!loading && error && (
-        <div className="mt-8 rounded-2xl border border-red-100 bg-red-50 p-6 text-center">
-          <p className="text-sm font-medium text-red-600">
-            {error}
-          </p>
+                    <div className="h-5 w-3/4 animate-pulse rounded bg-gray-200" />
 
-          <button
-            type="button"
-            onClick={() =>
-              window.location.reload()
-            }
-            className="mt-4 inline-flex items-center gap-2 rounded-lg bg-gray-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-gray-800"
-          >
-            <RefreshCw size={15} />
-            Try again
-          </button>
-        </div>
-      )}
+                    <div className="h-4 w-1/2 animate-pulse rounded bg-gray-200" />
 
-      {/* Wishlist */}
-      {!loading && !error && (
-        <>
-          {wishlistTurfs.length > 0 ? (
-            <div className="mt-8 grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
-              {wishlistTurfs.map((turf) => {
-                const turfId = String(
-                  turf.turfId || ""
-                ).trim();
-
-                const turfName =
-                  turf.name ||
-                  "Unnamed Turf";
-
-                const image =
-                  typeof turf.image ===
-                    "string" &&
-                  turf.image.trim()
-                    ? turf.image.trim()
-                    : FALLBACK_IMAGE;
-
-                const rating =
-                  getRating(turf);
-
-                const price =
-                  getPrice(turf);
-
-                return (
-                  <article
-                    key={
-                      turf.wishlistId ||
-                      turfId
-                    }
-                    className="group overflow-hidden rounded-2xl border border-gray-200 bg-white transition hover:-translate-y-1 hover:border-gray-300 hover:shadow-lg"
-                  >
-                    {/* Image */}
-                    <div className="relative aspect-[16/10] overflow-hidden bg-gray-100">
-                      <img
-                        src={image}
-                        alt={turfName}
-                        loading="lazy"
-                        className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
-                        onError={(
-                          event
-                        ) => {
-                          if (
-                            event.currentTarget
-                              .src !==
-                            FALLBACK_IMAGE
-                          ) {
-                            event.currentTarget.src =
-                              FALLBACK_IMAGE;
-                          }
-                        }}
-                      />
-
-                      {/* Sport */}
-                      <div className="absolute left-4 top-4">
-                        <span className="rounded-full bg-white/95 px-3 py-1.5 text-xs font-semibold text-gray-800 shadow-sm backdrop-blur">
-                          {turf.sport ||
-                            "Sports Turf"}
-                        </span>
-                      </div>
-
-                      {/* Remove */}
-                      <button
-                        type="button"
-                        onClick={() =>
-                          handleRemove(
-                            turfId
-                          )
-                        }
-                        disabled={
-                          removingId ===
-                          turfId
-                        }
-                        aria-label={`Remove ${turfName} from wishlist`}
-                        className="absolute right-4 top-4 flex h-10 w-10 items-center justify-center rounded-full bg-white text-red-500 shadow-sm transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
-                      >
-                        {removingId ===
-                        turfId ? (
-                          <Loader2
-                            size={18}
-                            className="animate-spin"
-                          />
-                        ) : (
-                          <Heart
-                            size={18}
-                            fill="currentColor"
-                          />
-                        )}
-                      </button>
+                    <div className="flex gap-2">
+                      <div className="h-7 w-16 animate-pulse rounded-full bg-gray-100" />
+                      <div className="h-7 w-20 animate-pulse rounded-full bg-gray-100" />
                     </div>
 
-                    {/* Content */}
-                    <div className="p-5">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <p className="text-xs font-medium text-green-600">
-                            {turf.sport ||
-                              "Sports Turf"}
-                          </p>
+                    <div className="h-px bg-gray-100" />
 
-                          <h2
-                            className="mt-1 truncate font-semibold text-gray-900"
-                            title={turfName}
-                          >
-                            {turfName}
-                          </h2>
-                        </div>
+                    <div className="flex justify-between">
+                      <div className="h-8 w-24 animate-pulse rounded bg-gray-200" />
+                      <div className="h-10 w-10 animate-pulse rounded-xl bg-gray-200" />
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
 
-                        <div className="flex shrink-0 items-center gap-1 rounded-lg bg-amber-50 px-2 py-1 text-xs font-semibold text-amber-700">
-                          <Star
-                            size={14}
-                            fill={
-                              rating !==
-                              "New"
-                                ? "currentColor"
-                                : "none"
+            <div className="mt-8 flex items-center justify-center gap-2 text-sm text-gray-500">
+              <Loader2
+                size={17}
+                className="animate-spin text-green-600"
+              />
+              Loading your wishlist...
+            </div>
+          </div>
+        )}
+
+        {/* Error */}
+        {!loading && error && (
+          <div className="animate-in fade-in slide-in-from-bottom-3 mx-auto max-w-lg rounded-2xl border border-red-100 bg-white p-8 text-center shadow-sm duration-500">
+            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-red-50 text-red-500">
+              <RefreshCw size={25} />
+            </div>
+
+            <h2 className="mt-5 text-lg font-semibold text-gray-900">
+              Unable to load wishlist
+            </h2>
+
+            <p className="mt-2 text-sm leading-6 text-gray-500">
+              {error}
+            </p>
+
+            <button
+              type="button"
+              onClick={() =>
+                window.location.reload()
+              }
+              className="mt-6 inline-flex h-11 items-center gap-2 rounded-xl bg-gray-900 px-5 text-sm font-semibold text-white transition duration-200 hover:-translate-y-0.5 hover:bg-gray-800 hover:shadow-md"
+            >
+              <RefreshCw size={15} />
+              Try again
+            </button>
+          </div>
+        )}
+
+        {/* Wishlist */}
+        {!loading && !error && (
+          <>
+            {wishlistTurfs.length > 0 ? (
+              <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-3">
+                {wishlistTurfs.map((turf, index) => {
+                  const turfId = String(
+                    turf.turfId || ""
+                  ).trim();
+
+                  const turfName =
+                    turf.name || "Unnamed Turf";
+
+                  const image =
+                    typeof turf.image === "string" &&
+                    turf.image.trim()
+                      ? turf.image.trim()
+                      : FALLBACK_IMAGE;
+
+                  const rating = getRating(turf);
+                  const price = getPrice(turf);
+
+                  return (
+                    <article
+                      key={
+                        turf.wishlistId ||
+                        turfId
+                      }
+                      style={{
+                        animationDelay: `${index * 80}ms`,
+                      }}
+                      className="animate-in fade-in slide-in-from-bottom-4 group overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm duration-500 hover:-translate-y-1 hover:border-green-200 hover:shadow-xl hover:shadow-gray-200/60"
+                    >
+                      {/* Image */}
+                      <div className="relative aspect-[16/10] overflow-hidden bg-gray-100">
+                        <img
+                          src={image}
+                          alt={turfName}
+                          loading="lazy"
+                          className="h-full w-full object-cover transition duration-700 ease-out group-hover:scale-105"
+                          onError={(event) => {
+                            if (
+                              event.currentTarget
+                                .src !== FALLBACK_IMAGE
+                            ) {
+                              event.currentTarget.src =
+                                FALLBACK_IMAGE;
                             }
-                          />
-
-                          <span>
-                            {rating}
-                          </span>
-                        </div>
-                      </div>
-
-                      {/* Location */}
-                      <div className="mt-3 flex items-start gap-1.5 text-sm text-gray-500">
-                        <MapPin
-                          size={15}
-                          className="mt-0.5 shrink-0"
+                          }}
                         />
 
-                        <span className="line-clamp-2">
-                          {turf.location ||
-                            turf.area ||
-                            "Dhaka, Bangladesh"}
-                        </span>
-                      </div>
+                        {/* Image overlay */}
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-black/10 opacity-70 transition duration-300 group-hover:opacity-80" />
 
-                      {/* Turf Info */}
-                      {(turf.size ||
-                        turf.surface ||
-                        turf.facilities
-                          ?.length >
-                          0) && (
-                        <div className="mt-3 flex flex-wrap gap-2">
-                          {turf.size && (
-                            <span className="rounded-full bg-gray-50 px-2.5 py-1 text-xs text-gray-500">
-                              {turf.size}
-                            </span>
-                          )}
-
-                          {turf.surface && (
-                            <span className="rounded-full bg-gray-50 px-2.5 py-1 text-xs text-gray-500">
-                              {turf.surface}
-                            </span>
-                          )}
-
-                          {turf.facilities
-                            ?.slice(0, 2)
-                            .map(
-                              (
-                                facility,
-                                index
-                              ) => (
-                                <span
-                                  key={`${facility}-${index}`}
-                                  className="rounded-full bg-gray-50 px-2.5 py-1 text-xs text-gray-500"
-                                >
-                                  {
-                                    facility
-                                  }
-                                </span>
-                              )
-                            )}
-                        </div>
-                      )}
-
-                      <div className="my-5 h-px bg-gray-100" />
-
-                      {/* Price + Details */}
-                      <div className="flex items-center justify-between gap-4">
-                        <div>
-                          <p className="text-xs text-gray-400">
-                            Starting from
-                          </p>
-
-                          <p className="mt-1 text-lg font-bold text-gray-900">
-                            ৳
-                            {price.toLocaleString(
-                              "en-BD"
-                            )}
-
-                            <span className="ml-1 text-xs font-normal text-gray-400">
-                              / hour
-                            </span>
-                          </p>
-                        </div>
-
-                        {turfId ? (
-                          <Link
-                            to={`/turfs/${encodeURIComponent(
-                              turfId
-                            )}`}
-                            aria-label={`View ${turfName}`}
-                            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gray-900 text-white transition hover:bg-green-600"
-                          >
-                            <ArrowUpRight
-                              size={17}
-                            />
-                          </Link>
-                        ) : (
-                          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gray-200 text-gray-400">
-                            <ArrowUpRight
-                              size={17}
-                            />
+                        {/* Sport */}
+                        <div className="absolute left-4 top-4">
+                          <span className="inline-flex rounded-full border border-white/40 bg-white/90 px-3 py-1.5 text-xs font-semibold text-gray-800 shadow-sm backdrop-blur">
+                            {turf.sport ||
+                              "Sports Turf"}
                           </span>
-                        )}
+                        </div>
+
+                        {/* Wishlist button */}
+                        <button
+                          type="button"
+                          onClick={() =>
+                            handleRemove(turfId)
+                          }
+                          disabled={
+                            removingId === turfId
+                          }
+                          aria-label={`Remove ${turfName} from wishlist`}
+                          className="absolute right-4 top-4 flex h-10 w-10 items-center justify-center rounded-full border border-white/40 bg-white/95 text-red-500 shadow-sm backdrop-blur transition duration-200 hover:scale-105 hover:bg-red-50 active:scale-95 disabled:cursor-not-allowed disabled:opacity-70"
+                        >
+                          {removingId ===
+                          turfId ? (
+                            <Loader2
+                              size={18}
+                              className="animate-spin"
+                            />
+                          ) : (
+                            <Heart
+                              size={18}
+                              fill="currentColor"
+                              className="transition-transform duration-200 hover:scale-110"
+                            />
+                          )}
+                        </button>
+
+                        {/* Rating */}
+                        <div className="absolute bottom-4 left-4">
+                          <div className="inline-flex items-center gap-1.5 rounded-lg bg-black/50 px-2.5 py-1.5 text-xs font-semibold text-white backdrop-blur-md">
+                            <Star
+                              size={13}
+                              fill={
+                                rating !== "New"
+                                  ? "currentColor"
+                                  : "none"
+                              }
+                              className="text-amber-400"
+                            />
+
+                            <span>{rating}</span>
+
+                            {Number(
+                              turf.reviews
+                            ) > 0 && (
+                              <span className="font-normal text-white/70">
+                                ({turf.reviews})
+                              </span>
+                            )}
+                          </div>
+                        </div>
                       </div>
-                    </div>
-                  </article>
-                );
-              })}
-            </div>
-          ) : (
-            <div className="mt-8 rounded-2xl border border-gray-200 bg-white py-20 text-center">
-              <Heart
-                size={38}
-                className="mx-auto text-gray-300"
-              />
 
-              <h2 className="mt-5 text-lg font-semibold text-gray-900">
-                Your wishlist is empty
-              </h2>
+                      {/* Content */}
+                      <div className="p-5">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="text-xs font-semibold uppercase tracking-wide text-green-600">
+                              {turf.sport ||
+                                "Sports Turf"}
+                            </p>
 
-              <p className="mt-2 text-sm text-gray-500">
-                Save your favorite turfs and
-                find them here later.
-              </p>
+                            <h2
+                              className="mt-1.5 truncate text-lg font-bold text-gray-900"
+                              title={turfName}
+                            >
+                              {turfName}
+                            </h2>
+                          </div>
+                        </div>
 
-              <Link
-                to="/turfs"
-                className="mt-6 inline-flex rounded-xl bg-green-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-green-700"
-              >
-                Explore Turfs
-              </Link>
-            </div>
-          )}
-        </>
-      )}
+                        {/* Location */}
+                        <div className="mt-3 flex items-start gap-2 text-sm text-gray-500">
+                          <MapPin
+                            size={15}
+                            className="mt-0.5 shrink-0 text-green-600"
+                          />
+
+                          <span className="line-clamp-2">
+                            {turf.location ||
+                              turf.area ||
+                              "Dhaka, Bangladesh"}
+                          </span>
+                        </div>
+
+                        {/* Tags */}
+                        {(turf.size ||
+                          turf.surface ||
+                          turf.facilities
+                            ?.length > 0) && (
+                          <div className="mt-4 flex flex-wrap gap-2">
+                            {turf.size && (
+                              <span className="rounded-full border border-gray-100 bg-gray-50 px-2.5 py-1 text-xs font-medium text-gray-500">
+                                {turf.size}
+                              </span>
+                            )}
+
+                            {turf.surface && (
+                              <span className="rounded-full border border-gray-100 bg-gray-50 px-2.5 py-1 text-xs font-medium text-gray-500">
+                                {turf.surface}
+                              </span>
+                            )}
+
+                            {turf.facilities
+                              ?.slice(0, 2)
+                              .map(
+                                (
+                                  facility,
+                                  facilityIndex
+                                ) => (
+                                  <span
+                                    key={`${facility}-${facilityIndex}`}
+                                    className="rounded-full border border-gray-100 bg-gray-50 px-2.5 py-1 text-xs font-medium text-gray-500"
+                                  >
+                                    {facility}
+                                  </span>
+                                )
+                              )}
+                          </div>
+                        )}
+
+                        <div className="my-5 h-px bg-gray-100" />
+
+                        {/* Footer */}
+                        <div className="flex items-center justify-between gap-4">
+                          <div>
+                            <p className="text-xs text-gray-400">
+                              Starting from
+                            </p>
+
+                            <p className="mt-1 text-xl font-bold text-gray-900">
+                              ৳
+                              {price.toLocaleString(
+                                "en-BD"
+                              )}
+
+                              <span className="ml-1 text-xs font-normal text-gray-400">
+                                / hour
+                              </span>
+                            </p>
+                          </div>
+
+                          {turfId ? (
+                            <Link
+                              to={`/turfs/${encodeURIComponent(
+                                turfId
+                              )}`}
+                              aria-label={`View ${turfName}`}
+                              className="group/button flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gray-900 text-white shadow-sm transition duration-300 hover:-translate-y-0.5 hover:bg-green-600 hover:shadow-md"
+                            >
+                              <ArrowUpRight
+                                size={18}
+                                className="transition-transform duration-300 group-hover/button:translate-x-0.5 group-hover/button:-translate-y-0.5"
+                              />
+                            </Link>
+                          ) : (
+                            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gray-100 text-gray-400">
+                              <ArrowUpRight
+                                size={18}
+                              />
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Remove action */}
+                        <button
+                          type="button"
+                          onClick={() =>
+                            handleRemove(turfId)
+                          }
+                          disabled={
+                            removingId === turfId
+                          }
+                          className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl border border-gray-100 py-2.5 text-xs font-semibold text-gray-500 transition duration-200 hover:border-red-100 hover:bg-red-50 hover:text-red-500 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          {removingId ===
+                          turfId ? (
+                            <Loader2
+                              size={14}
+                              className="animate-spin"
+                            />
+                          ) : (
+                            <Trash2 size={14} />
+                          )}
+
+                          {removingId ===
+                          turfId
+                            ? "Removing..."
+                            : "Remove from wishlist"}
+                        </button>
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+            ) : (
+              /* Empty state */
+              <div className="animate-in fade-in zoom-in-95 rounded-3xl border border-gray-200 bg-white px-6 py-20 text-center shadow-sm duration-500 sm:px-10">
+                <div className="relative mx-auto flex h-20 w-20 items-center justify-center">
+                  <div className="absolute inset-0 animate-ping rounded-full bg-green-100 opacity-50" />
+
+                  <div className="relative flex h-16 w-16 items-center justify-center rounded-2xl bg-green-50 text-green-600">
+                    <Heart
+                      size={30}
+                      strokeWidth={1.8}
+                    />
+                  </div>
+                </div>
+
+                <h2 className="mt-7 text-2xl font-bold text-gray-900">
+                  Your wishlist is empty
+                </h2>
+
+                <p className="mx-auto mt-3 max-w-md text-sm leading-6 text-gray-500">
+                  You haven't saved any turfs yet.
+                  Explore available turfs and save your
+                  favorites for later.
+                </p>
+
+                <Link
+                  to="/turfs"
+                  className="group mt-7 inline-flex h-11 items-center gap-2 rounded-xl bg-green-600 px-5 text-sm font-semibold text-white shadow-sm transition duration-300 hover:-translate-y-0.5 hover:bg-green-700 hover:shadow-lg hover:shadow-green-600/20"
+                >
+                  Explore Turfs
+
+                  <ArrowUpRight
+                    size={17}
+                    className="transition-transform duration-300 group-hover:translate-x-0.5 group-hover:-translate-y-0.5"
+                  />
+                </Link>
+              </div>
+            )}
+          </>
+        )}
+      </section>
     </main>
   );
 };

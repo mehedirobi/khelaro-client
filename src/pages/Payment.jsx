@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Link,
   useNavigate,
@@ -18,9 +18,10 @@ import {
   Loader2,
   AlertCircle,
   RefreshCw,
+  Sparkles,
+  ChevronRight,
 } from "lucide-react";
 import useAuth from "../hooks/useAuth";
-import { turfs } from "../data/turfs";
 
 const API_URL = (
   import.meta.env.VITE_API_URL || "http://localhost:3000"
@@ -35,18 +36,21 @@ const paymentMethods = [
     name: "bKash",
     description: "Pay securely with your bKash account",
     icon: Wallet,
+    color: "rose",
   },
   {
     id: "nagad",
     name: "Nagad",
     description: "Pay using your Nagad account",
     icon: Wallet,
+    color: "orange",
   },
   {
     id: "card",
     name: "Debit / Credit Card",
-    description: "Visa, Mastercard and other supported cards",
+    description: "Visa, Mastercard and supported cards",
     icon: CreditCard,
+    color: "blue",
   },
 ];
 
@@ -96,20 +100,20 @@ const convertToMinutes = (time) => {
   return hours * 60 + minutes;
 };
 
-const format24HourTime = (totalMinutes) => {
+const format24HourTime = (minutes) => {
   if (
-    !Number.isFinite(totalMinutes) ||
-    totalMinutes < 0 ||
-    totalMinutes >= 24 * 60
+    !Number.isFinite(minutes) ||
+    minutes < 0 ||
+    minutes >= 1440
   ) {
     return "";
   }
 
-  const hours = Math.floor(totalMinutes / 60);
-  const minutes = totalMinutes % 60;
+  const hours = Math.floor(minutes / 60);
+  const mins = minutes % 60;
 
   return `${String(hours).padStart(2, "0")}:${String(
-    minutes
+    mins
   ).padStart(2, "0")}`;
 };
 
@@ -130,35 +134,27 @@ const formatDisplayTime = (time) => {
 };
 
 const normalizeTime = (time) => {
-  const totalMinutes = convertToMinutes(time);
+  const minutes = convertToMinutes(time);
 
-  if (totalMinutes < 0) {
-    return "";
-  }
+  if (minutes < 0) return "";
 
-  return format24HourTime(totalMinutes);
+  return format24HourTime(minutes);
 };
 
 const getNextTime = (time) => {
-  const totalMinutes = convertToMinutes(time);
+  const minutes = convertToMinutes(time);
 
-  if (totalMinutes < 0) {
-    return "";
-  }
+  if (minutes < 0) return "";
 
-  const nextMinutes = totalMinutes + 60;
+  const nextMinutes = minutes + 60;
 
-  if (nextMinutes >= 24 * 60) {
-    return "";
-  }
+  if (nextMinutes >= 1440) return "";
 
   return format24HourTime(nextMinutes);
 };
 
 const getBookingList = (data) => {
-  if (Array.isArray(data)) {
-    return data;
-  }
+  if (Array.isArray(data)) return data;
 
   if (Array.isArray(data?.bookings)) {
     return data.bookings;
@@ -171,13 +167,25 @@ const getBookingList = (data) => {
   return [];
 };
 
+const getTurfFromResponse = (data) => {
+  if (data?.turf) return data.turf;
+
+  if (data?.data && !Array.isArray(data.data)) {
+    return data.data;
+  }
+
+  if (data?.result) return data.result;
+
+  return null;
+};
+
 const Payment = () => {
   const navigate = useNavigate();
   const { id } = useParams();
   const [searchParams] = useSearchParams();
 
-  const date = searchParams.get("date");
-  const slot = searchParams.get("slot");
+  const date = searchParams.get("date")?.trim() || "";
+  const slot = searchParams.get("slot")?.trim() || "";
 
   const { currentUser, loading: authLoading } =
     useAuth();
@@ -204,53 +212,86 @@ const Payment = () => {
   const [cvv, setCvv] = useState("");
 
   useEffect(() => {
-    const turfIdentifier = decodeURIComponent(
-      String(id || "")
-    ).trim();
+    let cancelled = false;
 
-    if (!turfIdentifier) {
-      setError("Invalid turf ID.");
-      setLoading(false);
-      return;
-    }
-
-    const foundTurf = turfs.find((item) => {
-      const itemId = String(
-        item?.id || ""
+    const loadTurf = async () => {
+      const turfIdentifier = decodeURIComponent(
+        String(id || "")
       ).trim();
 
-      const itemSlug = String(
-        item?.slug || ""
-      ).trim();
+      if (!turfIdentifier) {
+        setError("Invalid turf ID.");
+        setLoading(false);
+        return;
+      }
 
-      return (
-        itemId === turfIdentifier ||
-        itemSlug === turfIdentifier
-      );
-    });
+      try {
+        setLoading(true);
+        setError("");
 
-    if (!foundTurf) {
-      setError("Turf not found.");
-      setTurf(null);
-      setLoading(false);
-      return;
-    }
+        const response = await fetch(
+          `${API_URL}/turfs/${encodeURIComponent(
+            turfIdentifier
+          )}`
+        );
 
-    setTurf(foundTurf);
-    setError("");
-    setLoading(false);
+        const data = await response
+          .json()
+          .catch(() => ({}));
+
+        if (!response.ok) {
+          throw new Error(
+            data?.message ||
+              data?.error ||
+              "Unable to load turf."
+          );
+        }
+
+        const foundTurf =
+          getTurfFromResponse(data);
+
+        if (!foundTurf) {
+          throw new Error("Turf not found.");
+        }
+
+        if (!cancelled) {
+          setTurf(foundTurf);
+        }
+      } catch (err) {
+        console.error("Turf loading error:", err);
+
+        if (!cancelled) {
+          setTurf(null);
+          setError(
+            err?.message ||
+              "Failed to load turf information."
+          );
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    };
+
+    loadTurf();
+
+    return () => {
+      cancelled = true;
+    };
   }, [id]);
 
   const validatePaymentDetails = () => {
-    if (selectedMethod === "bkash") {
+    if (
+      selectedMethod === "bkash" ||
+      selectedMethod === "nagad"
+    ) {
       if (!/^01\d{9}$/.test(accountNumber)) {
-        return "Enter a valid 11-digit bKash number.";
-      }
-    }
-
-    if (selectedMethod === "nagad") {
-      if (!/^01\d{9}$/.test(accountNumber)) {
-        return "Enter a valid 11-digit Nagad number.";
+        return `Enter a valid 11-digit ${
+          selectedMethod === "bkash"
+            ? "bKash"
+            : "Nagad"
+        } number.`;
       }
     }
 
@@ -283,9 +324,7 @@ const Payment = () => {
       `?turfId=${encodeURIComponent(turfId)}` +
       `&date=${encodeURIComponent(selectedDate)}`;
 
-    const response = await fetch(url, {
-      method: "GET",
-    });
+    const response = await fetch(url);
 
     const data = await response
       .json()
@@ -360,9 +399,7 @@ const Payment = () => {
   };
 
   const handlePayment = async () => {
-    if (paying) {
-      return;
-    }
+    if (paying) return;
 
     setPaymentError("");
 
@@ -386,7 +423,7 @@ const Payment = () => {
 
     if (!userEmail) {
       setPaymentError(
-        "Please login to your Khelaro account before completing the booking payment."
+        "Please login before completing your booking."
       );
       return;
     }
@@ -404,7 +441,7 @@ const Payment = () => {
 
     if (!startTime || !endTime) {
       setPaymentError(
-        "Invalid booking time slot. Please go back and select the time again."
+        "Invalid booking time slot. Please select the time again."
       );
       return;
     }
@@ -415,11 +452,7 @@ const Payment = () => {
     const endMinutes =
       convertToMinutes(endTime);
 
-    if (
-      startMinutes < 0 ||
-      endMinutes < 0 ||
-      endMinutes <= startMinutes
-    ) {
+    if (endMinutes <= startMinutes) {
       setPaymentError(
         "Invalid booking time slot."
       );
@@ -427,17 +460,15 @@ const Payment = () => {
     }
 
     const turfId = String(
-      turf?.id ||
+      turf?._id ||
+        turf?.id ||
         turf?.turfId ||
-        turf?._id ||
         id ||
         ""
     ).trim();
 
     if (!turfId) {
-      setPaymentError(
-        "Turf ID is missing."
-      );
+      setPaymentError("Turf ID is missing.");
       return;
     }
 
@@ -459,10 +490,6 @@ const Payment = () => {
     try {
       setPaying(true);
 
-      /*
-       * Check availability one more time
-       * before creating the booking.
-       */
       const bookingList =
         await checkAvailability({
           turfId,
@@ -482,7 +509,7 @@ const Payment = () => {
             startTime
           )} - ${formatDisplayTime(
             endTime
-          )} is already booked. Please go back and choose another slot.`
+          )} is already booked.`
         );
 
         return;
@@ -515,8 +542,8 @@ const Payment = () => {
             price: Number(turf?.price) || 0,
 
             paymentMethod: selectedMethod,
-
             paymentStatus: "paid",
+            status: "confirmed",
           }),
         }
       );
@@ -542,7 +569,7 @@ const Payment = () => {
             .includes("already booking")
         ) {
           throw new Error(
-            `This slot was just booked by another user. Please choose another time slot.`
+            "This slot was just booked by another user. Please choose another slot."
           );
         }
 
@@ -576,10 +603,10 @@ const Payment = () => {
         );
       }
 
-      const displayStartTime =
+      const displayStart =
         formatDisplayTime(startTime);
 
-      const displayEndTime =
+      const displayEnd =
         formatDisplayTime(endTime);
 
       navigate(
@@ -588,11 +615,13 @@ const Payment = () => {
         )}?date=${encodeURIComponent(
           date
         )}&slot=${encodeURIComponent(
-          `${displayStartTime} - ${displayEndTime}`
+          `${displayStart} - ${displayEnd}`
         )}&method=${encodeURIComponent(
           selectedMethod
         )}&bookingId=${encodeURIComponent(
           bookingId
+        )}&amount=${encodeURIComponent(
+          Number(turf?.price) || 0
         )}`,
         {
           replace: true,
@@ -613,62 +642,17 @@ const Payment = () => {
     }
   };
 
-  if (loading || authLoading) {
-    return (
-      <main className="flex min-h-[70vh] items-center justify-center bg-gray-50 px-4">
-        <div className="flex items-center gap-3 text-sm text-gray-500">
-          <Loader2
-            size={22}
-            className="animate-spin text-green-600"
-          />
-
-          {loading
-            ? "Loading payment..."
-            : "Checking login status..."}
-        </div>
-      </main>
-    );
-  }
-
-  if (!turf || !date || !slot) {
-    return (
-      <main className="flex min-h-[70vh] items-center justify-center bg-gray-50 px-4">
-        <div className="max-w-md text-center">
-          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-red-50">
-            <AlertCircle
-              size={26}
-              className="text-red-500"
-            />
-          </div>
-
-          <h1 className="mt-5 text-2xl font-bold text-gray-900">
-            Payment information missing
-          </h1>
-
-          <p className="mt-3 text-sm leading-6 text-gray-500">
-            {error ||
-              "Please complete your booking details before proceeding to payment."}
-          </p>
-
-          <Link
-            to="/turfs"
-            className="mt-6 inline-flex items-center gap-2 rounded-xl bg-green-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-green-700"
-          >
-            <ArrowLeft size={17} />
-            Back to Turfs
-          </Link>
-        </div>
-      </main>
-    );
-  }
-
-  const turfId = String(
-    turf?.id ||
-      turf?.turfId ||
-      turf?._id ||
-      id ||
-      ""
-  ).trim();
+  const turfId = useMemo(
+    () =>
+      String(
+        turf?._id ||
+          turf?.id ||
+          turf?.turfId ||
+          id ||
+          ""
+      ).trim(),
+    [turf, id]
+  );
 
   const turfName = String(
     turf?.name || "Unnamed Turf"
@@ -686,22 +670,32 @@ const Payment = () => {
       "Dhaka, Bangladesh"
   ).trim();
 
-  const turfPriceValue = Number(turf?.price);
+  const turfPrice = useMemo(() => {
+    const price = Number(turf?.price);
 
-  const turfPrice =
-    Number.isFinite(turfPriceValue) &&
-    turfPriceValue >= 0
-      ? turfPriceValue
+    return Number.isFinite(price) && price >= 0
+      ? price
       : 0;
+  }, [turf?.price]);
 
-  const formattedDate = new Date(
-    `${date}T00:00:00`
-  ).toLocaleDateString("en-BD", {
-    weekday: "short",
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
+  const formattedDate = useMemo(() => {
+    if (!date) return "Not available";
+
+    const parsed = new Date(
+      `${date}T00:00:00`
+    );
+
+    if (Number.isNaN(parsed.getTime())) {
+      return date;
+    }
+
+    return parsed.toLocaleDateString("en-BD", {
+      weekday: "short",
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    });
+  }, [date]);
 
   const normalizedStartTime =
     normalizeTime(slot);
@@ -720,14 +714,83 @@ const Payment = () => {
       : slot;
 
   const serviceFee = 50;
+  const totalPrice = turfPrice + serviceFee;
 
-  const totalPrice =
-    turfPrice + serviceFee;
+  if (loading || authLoading) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-gray-50 px-4">
+        <div className="w-full max-w-sm text-center animate-in fade-in zoom-in-95 duration-500">
+          <div className="relative mx-auto flex h-20 w-20 items-center justify-center">
+            <div className="absolute inset-0 animate-ping rounded-3xl bg-green-100 opacity-50" />
+
+            <div className="relative flex h-16 w-16 items-center justify-center rounded-2xl bg-white shadow-sm ring-1 ring-green-100">
+              <Loader2
+                size={28}
+                className="animate-spin text-green-600"
+              />
+            </div>
+          </div>
+
+          <h1 className="mt-6 text-xl font-bold text-gray-900">
+            {loading
+              ? "Preparing checkout"
+              : "Checking your account"}
+          </h1>
+
+          <p className="mt-2 text-sm leading-6 text-gray-500">
+            {loading
+              ? "Loading your turf and booking information..."
+              : "Verifying your login status..."}
+          </p>
+
+          <div className="mx-auto mt-6 h-1.5 w-48 overflow-hidden rounded-full bg-gray-200">
+            <div className="h-full w-1/2 animate-[paymentLoading_1.4s_ease-in-out_infinite] rounded-full bg-green-500" />
+          </div>
+        </div>
+      </main>
+    );
+  }
+
+  if (!turf || !date || !slot) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-gray-50 px-4">
+        <div className="w-full max-w-md animate-in fade-in slide-in-from-bottom-5 text-center duration-500">
+          <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-3xl bg-red-50">
+            <AlertCircle
+              size={32}
+              className="text-red-500"
+            />
+          </div>
+
+          <h1 className="mt-6 text-2xl font-bold text-gray-900">
+            Payment information unavailable
+          </h1>
+
+          <p className="mt-3 text-sm leading-6 text-gray-500">
+            {error ||
+              "Please complete your booking information before continuing."}
+          </p>
+
+          <Link
+            to="/turfs"
+            className="group mt-7 inline-flex h-12 items-center gap-2 rounded-xl bg-green-600 px-6 text-sm font-semibold text-white shadow-sm transition duration-300 hover:-translate-y-0.5 hover:bg-green-700 hover:shadow-md"
+          >
+            <ArrowLeft
+              size={17}
+              className="transition-transform duration-300 group-hover:-translate-x-1"
+            />
+            Back to Turfs
+          </Link>
+        </div>
+      </main>
+    );
+  }
 
   return (
-    <main className="min-h-screen bg-gray-50">
+    <main className="min-h-screen overflow-hidden bg-gray-50">
+      {/* Header */}
       <section className="border-b border-gray-200 bg-white">
-        <div className="mx-auto max-w-6xl px-4 py-5 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-6xl px-4 py-4 sm:px-6 lg:px-8">
           <Link
             to={`/booking/${encodeURIComponent(
               turfId
@@ -736,45 +799,72 @@ const Payment = () => {
             )}&slot=${encodeURIComponent(
               slot
             )}`}
-            className="inline-flex items-center gap-2 text-sm font-medium text-gray-500 transition hover:text-green-600"
+            className="group inline-flex items-center gap-2 text-sm font-medium text-gray-500 transition duration-200 hover:text-green-600"
           >
-            <ArrowLeft size={17} />
+            <ArrowLeft
+              size={17}
+              className="transition-transform duration-300 group-hover:-translate-x-1"
+            />
             Back to booking
           </Link>
         </div>
       </section>
 
-      <section className="mx-auto max-w-6xl px-4 py-10 sm:px-6 lg:px-8">
-        <div className="mb-8">
-          <div className="inline-flex items-center gap-2 rounded-full bg-green-50 px-3 py-1.5 text-xs font-semibold text-green-700">
-            <ShieldCheck size={15} />
-            Secure payment
+      {/* Main */}
+      <section className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-10 lg:px-8">
+        {/* Heading */}
+        <div className="animate-in fade-in slide-in-from-bottom-3 mb-8 duration-500">
+          <div className="flex flex-wrap items-center gap-3">
+            <span className="inline-flex items-center gap-2 rounded-full border border-green-100 bg-green-50 px-3 py-1.5 text-xs font-semibold text-green-700">
+              <ShieldCheck size={15} />
+              Secure checkout
+            </span>
+
+            <span className="text-xs font-medium text-gray-400">
+              Step 2 of 2
+            </span>
           </div>
 
-          <h1 className="mt-4 text-3xl font-bold tracking-tight text-gray-900">
-            Complete your payment
-          </h1>
+          <div className="mt-4 flex items-start justify-between gap-4">
+            <div>
+              <h1 className="text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl">
+                Complete your payment
+              </h1>
 
-          <p className="mt-2 text-sm text-gray-500">
-            Choose your preferred payment
-            method to confirm your booking.
-          </p>
+              <p className="mt-2 max-w-2xl text-sm leading-6 text-gray-500 sm:text-base">
+                Choose your preferred payment method
+                and confirm your turf booking.
+              </p>
+            </div>
+
+            <div className="hidden h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-green-50 text-green-600 sm:flex">
+              <Sparkles size={21} />
+            </div>
+          </div>
         </div>
 
-        <div className="grid gap-8 lg:grid-cols-[1fr_380px]">
+        <div className="grid gap-7 lg:grid-cols-[1fr_380px]">
+          {/* Left */}
           <div className="space-y-6">
-            <div className="rounded-2xl border border-gray-200 bg-white p-5 sm:p-6">
-              <h2 className="text-lg font-semibold text-gray-900">
-                Payment method
-              </h2>
+            {/* Payment method */}
+            <section className="animate-in fade-in slide-in-from-bottom-4 rounded-3xl border border-gray-200 bg-white p-5 shadow-sm duration-500 sm:p-6">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-green-600">
+                  Step 1
+                </p>
 
-              <p className="mt-1 text-sm text-gray-500">
-                Select how you would like to pay.
-              </p>
+                <h2 className="mt-1 text-lg font-bold text-gray-900">
+                  Payment method
+                </h2>
 
-              <div className="mt-6 space-y-3">
+                <p className="mt-1 text-sm text-gray-500">
+                  Select how you would like to pay.
+                </p>
+              </div>
+
+              <div className="mt-6 grid gap-3">
                 {paymentMethods.map(
-                  (method) => {
+                  (method, index) => {
                     const Icon = method.icon;
 
                     const isSelected =
@@ -790,54 +880,65 @@ const Payment = () => {
                           setSelectedMethod(
                             method.id
                           );
-
                           setPaymentError("");
                           setAccountNumber("");
                           setCardNumber("");
                           setExpiry("");
                           setCvv("");
                         }}
-                        className={`flex w-full items-center justify-between rounded-xl border p-4 text-left transition ${
+                        style={{
+                          animationDelay: `${
+                            index * 70
+                          }ms`,
+                        }}
+                        className={`group relative flex w-full items-center justify-between overflow-hidden rounded-2xl border p-4 text-left transition-all duration-300 animate-in fade-in slide-in-from-bottom-2 ${
                           isSelected
-                            ? "border-green-600 bg-green-50"
-                            : "border-gray-200 hover:border-green-300 hover:bg-gray-50"
+                            ? "border-green-500 bg-green-50/70 shadow-sm"
+                            : "border-gray-200 bg-white hover:-translate-y-0.5 hover:border-green-300 hover:shadow-sm"
                         } ${
                           paying
-                            ? "cursor-not-allowed opacity-70"
+                            ? "cursor-not-allowed opacity-60"
                             : ""
                         }`}
                       >
-                        <div className="flex items-center gap-4">
+                        {isSelected && (
+                          <span className="absolute inset-y-0 left-0 w-1 rounded-full bg-green-500" />
+                        )}
+
+                        <div className="flex min-w-0 items-center gap-4">
                           <div
-                            className={`flex h-11 w-11 items-center justify-center rounded-xl ${
+                            className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl transition-all duration-300 ${
                               isSelected
-                                ? "bg-green-600 text-white"
-                                : "bg-gray-100 text-gray-600"
+                                ? "scale-105 bg-green-600 text-white shadow-md shadow-green-600/20"
+                                : "bg-gray-100 text-gray-600 group-hover:bg-green-50 group-hover:text-green-600"
                             }`}
                           >
                             <Icon size={21} />
                           </div>
 
-                          <div>
+                          <div className="min-w-0">
                             <p className="text-sm font-semibold text-gray-900">
                               {method.name}
                             </p>
 
-                            <p className="mt-1 text-xs text-gray-500">
+                            <p className="mt-1 truncate text-xs leading-5 text-gray-500">
                               {method.description}
                             </p>
                           </div>
                         </div>
 
                         <div
-                          className={`flex h-5 w-5 items-center justify-center rounded-full border ${
+                          className={`ml-4 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border transition-all duration-300 ${
                             isSelected
-                              ? "border-green-600 bg-green-600 text-white"
-                              : "border-gray-300"
+                              ? "scale-110 border-green-600 bg-green-600 text-white"
+                              : "border-gray-300 bg-white"
                           }`}
                         >
                           {isSelected && (
-                            <Check size={13} />
+                            <Check
+                              size={14}
+                              className="animate-in zoom-in duration-200"
+                            />
                           )}
                         </div>
                       </button>
@@ -845,177 +946,187 @@ const Payment = () => {
                   }
                 )}
               </div>
-            </div>
+            </section>
 
-            <div className="rounded-2xl border border-gray-200 bg-white p-5 sm:p-6">
-              <h2 className="text-lg font-semibold text-gray-900">
+            {/* Payment details */}
+            <section className="animate-in fade-in slide-in-from-bottom-4 rounded-3xl border border-gray-200 bg-white p-5 shadow-sm duration-700 sm:p-6">
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-green-600">
+                Step 2
+              </p>
+
+              <h2 className="mt-1 text-lg font-bold text-gray-900">
                 Payment details
               </h2>
 
-              {selectedMethod === "bkash" && (
-                <div className="mt-6">
-                  <label className="mb-2 block text-sm font-medium text-gray-900">
-                    bKash account number
-                  </label>
-
-                  <input
-                    type="tel"
-                    inputMode="numeric"
-                    maxLength={11}
-                    value={accountNumber}
-                    disabled={paying}
-                    onChange={(event) =>
-                      setAccountNumber(
-                        event.target.value
-                          .replace(/\D/g, "")
-                          .slice(0, 11)
-                      )
-                    }
-                    placeholder="01XXXXXXXXX"
-                    className="h-12 w-full rounded-xl border border-gray-200 px-4 text-sm outline-none transition focus:border-green-500 focus:ring-4 focus:ring-green-500/10 disabled:bg-gray-50"
-                  />
-
-                  <p className="mt-2 text-xs text-gray-400">
-                    Enter the mobile number connected
-                    to your bKash account.
-                  </p>
-                </div>
-              )}
-
-              {selectedMethod === "nagad" && (
-                <div className="mt-6">
-                  <label className="mb-2 block text-sm font-medium text-gray-900">
-                    Nagad account number
-                  </label>
-
-                  <input
-                    type="tel"
-                    inputMode="numeric"
-                    maxLength={11}
-                    value={accountNumber}
-                    disabled={paying}
-                    onChange={(event) =>
-                      setAccountNumber(
-                        event.target.value
-                          .replace(/\D/g, "")
-                          .slice(0, 11)
-                      )
-                    }
-                    placeholder="01XXXXXXXXX"
-                    className="h-12 w-full rounded-xl border border-gray-200 px-4 text-sm outline-none transition focus:border-green-500 focus:ring-4 focus:ring-green-500/10 disabled:bg-gray-50"
-                  />
-
-                  <p className="mt-2 text-xs text-gray-400">
-                    Enter the mobile number connected
-                    to your Nagad account.
-                  </p>
-                </div>
-              )}
-
-              {selectedMethod === "card" && (
-                <div className="mt-6 grid gap-4">
-                  <div>
-                    <label className="mb-2 block text-sm font-medium text-gray-900">
-                      Card number
+              <div
+                key={selectedMethod}
+                className="animate-in fade-in slide-in-from-right-3 duration-300"
+              >
+                {(selectedMethod === "bkash" ||
+                  selectedMethod === "nagad") && (
+                  <div className="mt-6">
+                    <label className="mb-2 block text-sm font-semibold text-gray-900">
+                      {selectedMethod ===
+                      "bkash"
+                        ? "bKash"
+                        : "Nagad"}{" "}
+                      account number
                     </label>
 
-                    <input
-                      type="text"
-                      inputMode="numeric"
-                      maxLength={19}
-                      value={cardNumber}
-                      disabled={paying}
-                      onChange={(event) => {
-                        const value =
-                          event.target.value
-                            .replace(/\D/g, "")
-                            .slice(0, 16);
-
-                        const formatted =
-                          value.replace(
-                            /(\d{4})(?=\d)/g,
-                            "$1 "
-                          );
-
-                        setCardNumber(
-                          formatted
-                        );
-                      }}
-                      placeholder="1234 5678 9012 3456"
-                      className="h-12 w-full rounded-xl border border-gray-200 px-4 text-sm outline-none transition focus:border-green-500 focus:ring-4 focus:ring-green-500/10 disabled:bg-gray-50"
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="mb-2 block text-sm font-medium text-gray-900">
-                        Expiry date
-                      </label>
-
-                      <input
-                        type="text"
-                        inputMode="numeric"
-                        maxLength={7}
-                        value={expiry}
-                        disabled={paying}
-                        onChange={(event) => {
-                          const value =
-                            event.target.value
-                              .replace(/\D/g, "")
-                              .slice(0, 4);
-
-                          if (value.length > 2) {
-                            setExpiry(
-                              `${value.slice(
-                                0,
-                                2
-                              )} / ${value.slice(2)}`
-                            );
-                          } else {
-                            setExpiry(value);
-                          }
-                        }}
-                        placeholder="MM / YY"
-                        className="h-12 w-full rounded-xl border border-gray-200 px-4 text-sm outline-none transition focus:border-green-500 focus:ring-4 focus:ring-green-500/10 disabled:bg-gray-50"
+                    <div className="relative">
+                      <Wallet
+                        size={18}
+                        className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400"
                       />
-                    </div>
-
-                    <div>
-                      <label className="mb-2 block text-sm font-medium text-gray-900">
-                        CVV
-                      </label>
 
                       <input
-                        type="password"
+                        type="tel"
                         inputMode="numeric"
-                        maxLength={4}
-                        value={cvv}
+                        maxLength={11}
+                        value={accountNumber}
                         disabled={paying}
                         onChange={(event) =>
-                          setCvv(
+                          setAccountNumber(
                             event.target.value
                               .replace(/\D/g, "")
-                              .slice(0, 4)
+                              .slice(0, 11)
                           )
                         }
-                        placeholder="123"
-                        className="h-12 w-full rounded-xl border border-gray-200 px-4 text-sm outline-none transition focus:border-green-500 focus:ring-4 focus:ring-green-500/10 disabled:bg-gray-50"
+                        placeholder="01XXXXXXXXX"
+                        className="h-13 w-full rounded-xl border border-gray-200 bg-white pl-11 pr-4 text-sm outline-none transition duration-200 placeholder:text-gray-300 focus:border-green-500 focus:ring-4 focus:ring-green-500/10 disabled:bg-gray-50"
                       />
                     </div>
-                  </div>
-                </div>
-              )}
-            </div>
 
+                    <div className="mt-3 flex items-start gap-2 rounded-xl bg-gray-50 p-3">
+                      <ShieldCheck
+                        size={15}
+                        className="mt-0.5 shrink-0 text-green-600"
+                      />
+
+                      <p className="text-xs leading-5 text-gray-500">
+                        Enter the mobile number connected
+                        to your{" "}
+                        {selectedMethod === "bkash"
+                          ? "bKash"
+                          : "Nagad"}{" "}
+                        account.
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {selectedMethod === "card" && (
+                  <div className="mt-6 grid gap-4">
+                    <div>
+                      <label className="mb-2 block text-sm font-semibold text-gray-900">
+                        Card number
+                      </label>
+
+                      <div className="relative">
+                        <CreditCard
+                          size={18}
+                          className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400"
+                        />
+
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          maxLength={19}
+                          value={cardNumber}
+                          disabled={paying}
+                          onChange={(event) => {
+                            const value =
+                              event.target.value
+                                .replace(/\D/g, "")
+                                .slice(0, 16);
+
+                            setCardNumber(
+                              value.replace(
+                                /(\d{4})(?=\d)/g,
+                                "$1 "
+                              )
+                            );
+                          }}
+                          placeholder="1234 5678 9012 3456"
+                          className="h-13 w-full rounded-xl border border-gray-200 bg-white pl-11 pr-4 text-sm tracking-wide outline-none transition duration-200 placeholder:text-gray-300 focus:border-green-500 focus:ring-4 focus:ring-green-500/10 disabled:bg-gray-50"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="mb-2 block text-sm font-semibold text-gray-900">
+                          Expiry date
+                        </label>
+
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          maxLength={7}
+                          value={expiry}
+                          disabled={paying}
+                          onChange={(event) => {
+                            const value =
+                              event.target.value
+                                .replace(/\D/g, "")
+                                .slice(0, 4);
+
+                            setExpiry(
+                              value.length > 2
+                                ? `${value.slice(
+                                    0,
+                                    2
+                                  )} / ${value.slice(
+                                    2
+                                  )}`
+                                : value
+                            );
+                          }}
+                          placeholder="MM / YY"
+                          className="h-13 w-full rounded-xl border border-gray-200 bg-white px-4 text-sm outline-none transition duration-200 placeholder:text-gray-300 focus:border-green-500 focus:ring-4 focus:ring-green-500/10 disabled:bg-gray-50"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="mb-2 block text-sm font-semibold text-gray-900">
+                          CVV
+                        </label>
+
+                        <input
+                          type="password"
+                          inputMode="numeric"
+                          maxLength={4}
+                          value={cvv}
+                          disabled={paying}
+                          onChange={(event) =>
+                            setCvv(
+                              event.target.value
+                                .replace(/\D/g, "")
+                                .slice(0, 4)
+                            )
+                          }
+                          placeholder="123"
+                          className="h-13 w-full rounded-xl border border-gray-200 bg-white px-4 text-sm tracking-widest outline-none transition duration-200 placeholder:tracking-normal placeholder:text-gray-300 focus:border-green-500 focus:ring-4 focus:ring-green-500/10 disabled:bg-gray-50"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </section>
+
+            {/* Error */}
             {paymentError && (
-              <div className="flex gap-3 rounded-2xl border border-red-100 bg-red-50 p-5">
-                <AlertCircle
-                  size={20}
-                  className="shrink-0 text-red-500"
-                />
+              <div className="animate-in fade-in slide-in-from-bottom-3 flex gap-3 rounded-2xl border border-red-100 bg-red-50 p-5 duration-300">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-red-100">
+                  <AlertCircle
+                    size={19}
+                    className="text-red-500"
+                  />
+                </div>
 
                 <div className="min-w-0">
-                  <h3 className="text-sm font-semibold text-red-800">
+                  <h3 className="text-sm font-bold text-red-800">
                     Booking could not be completed
                   </h3>
 
@@ -1032,7 +1143,7 @@ const Payment = () => {
                       )}?date=${encodeURIComponent(
                         date
                       )}`}
-                      className="mt-3 inline-flex items-center gap-1.5 text-xs font-semibold text-red-700 hover:text-red-800"
+                      className="mt-3 inline-flex items-center gap-1.5 text-xs font-bold text-red-700 transition hover:text-red-900"
                     >
                       <RefreshCw size={13} />
                       Choose another slot
@@ -1042,36 +1153,52 @@ const Payment = () => {
               </div>
             )}
 
-            <div className="flex gap-3 rounded-2xl border border-green-100 bg-green-50 p-5">
-              <LockKeyhole
-                size={20}
-                className="shrink-0 text-green-600"
-              />
+            {/* Security */}
+            <div className="animate-in fade-in rounded-2xl border border-green-100 bg-green-50 p-5 duration-700">
+              <div className="flex gap-3">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white text-green-600 shadow-sm">
+                  <LockKeyhole size={18} />
+                </div>
 
-              <div>
-                <h3 className="text-sm font-semibold text-gray-900">
-                  Your payment is secure
-                </h3>
+                <div>
+                  <h3 className="text-sm font-bold text-gray-900">
+                    Your payment is secure
+                  </h3>
 
-                <p className="mt-1 text-sm leading-6 text-gray-600">
-                  Your booking information is securely
-                  submitted to the Khelaro server.
-                </p>
+                  <p className="mt-1 text-sm leading-6 text-gray-600">
+                    Your booking information is securely
+                    submitted to the Khelaro server.
+                  </p>
+                </div>
               </div>
             </div>
           </div>
 
+          {/* Summary */}
           <aside>
-            <div className="sticky top-24 rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
-              <h2 className="text-lg font-semibold text-gray-900">
-                Booking summary
-              </h2>
+            <div className="animate-in fade-in slide-in-from-right-5 sticky top-24 rounded-3xl border border-gray-200 bg-white p-5 shadow-sm duration-700 sm:p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.14em] text-green-600">
+                    Order
+                  </p>
 
-              <div className="mt-5 overflow-hidden rounded-xl">
+                  <h2 className="mt-1 text-lg font-bold text-gray-900">
+                    Booking summary
+                  </h2>
+                </div>
+
+                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-green-50 text-green-600">
+                  <Check size={18} />
+                </div>
+              </div>
+
+              {/* Turf image */}
+              <div className="group relative mt-5 overflow-hidden rounded-2xl">
                 <img
                   src={turfImage}
                   alt={turfName}
-                  className="h-36 w-full object-cover"
+                  className="h-44 w-full object-cover transition duration-700 group-hover:scale-105"
                   onError={(event) => {
                     if (
                       event.currentTarget.src !==
@@ -1082,66 +1209,76 @@ const Payment = () => {
                     }
                   }}
                 />
-              </div>
 
-              <div className="mt-4">
-                <h3 className="font-semibold text-gray-900">
-                  {turfName}
-                </h3>
+                <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent" />
 
-                <div className="mt-2 flex items-center gap-2 text-sm text-gray-500">
-                  <MapPin size={15} />
-                  {turfLocation}
+                <div className="absolute bottom-3 left-3 rounded-full bg-white/95 px-3 py-1 text-xs font-semibold text-gray-800 shadow-sm backdrop-blur">
+                  {turf?.sport || "Sports Turf"}
                 </div>
               </div>
 
-              <div className="my-5 border-t border-gray-100" />
+              <div className="mt-4">
+                <h3 className="text-lg font-bold text-gray-900">
+                  {turfName}
+                </h3>
 
-              <div className="space-y-4 text-sm">
-                <div className="flex items-center gap-3">
-                  <CalendarDays
-                    size={17}
-                    className="text-green-600"
+                <div className="mt-2 flex items-start gap-2 text-sm text-gray-500">
+                  <MapPin
+                    size={15}
+                    className="mt-0.5 shrink-0 text-green-600"
                   />
 
-                  <div>
-                    <p className="text-xs text-gray-400">
+                  <span>{turfLocation}</span>
+                </div>
+              </div>
+
+              <div className="my-5 h-px bg-gray-100" />
+
+              {/* Booking info */}
+              <div className="space-y-3">
+                <div className="flex items-center gap-3 rounded-xl bg-gray-50 p-3">
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white text-green-600 shadow-sm">
+                    <CalendarDays size={17} />
+                  </div>
+
+                  <div className="min-w-0">
+                    <p className="text-[11px] font-medium uppercase tracking-wide text-gray-400">
                       Date
                     </p>
 
-                    <p className="font-medium text-gray-900">
+                    <p className="mt-0.5 truncate text-sm font-semibold text-gray-900">
                       {formattedDate}
                     </p>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-3">
-                  <Clock
-                    size={17}
-                    className="text-green-600"
-                  />
+                <div className="flex items-center gap-3 rounded-xl bg-gray-50 p-3">
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white text-green-600 shadow-sm">
+                    <Clock size={17} />
+                  </div>
 
-                  <div>
-                    <p className="text-xs text-gray-400">
+                  <div className="min-w-0">
+                    <p className="text-[11px] font-medium uppercase tracking-wide text-gray-400">
                       Time slot
                     </p>
 
-                    <p className="font-medium text-gray-900">
+                    <p className="mt-0.5 truncate text-sm font-semibold text-gray-900">
                       {displaySlot}
                     </p>
                   </div>
                 </div>
               </div>
 
-              <div className="my-5 border-t border-gray-100" />
+              <div className="my-5 h-px bg-gray-100" />
 
+              {/* Price */}
               <div className="space-y-3 text-sm">
-                <div className="flex justify-between">
+                <div className="flex items-center justify-between">
                   <span className="text-gray-500">
                     Turf booking
                   </span>
 
-                  <span className="font-medium text-gray-900">
+                  <span className="font-semibold text-gray-900">
                     ৳
                     {turfPrice.toLocaleString(
                       "en-BD"
@@ -1149,22 +1286,31 @@ const Payment = () => {
                   </span>
                 </div>
 
-                <div className="flex justify-between">
+                <div className="flex items-center justify-between">
                   <span className="text-gray-500">
                     Service fee
                   </span>
 
-                  <span className="font-medium text-gray-900">
-                    ৳{serviceFee}
+                  <span className="font-semibold text-gray-900">
+                    ৳
+                    {serviceFee.toLocaleString(
+                      "en-BD"
+                    )}
                   </span>
                 </div>
 
-                <div className="flex justify-between border-t border-gray-100 pt-4">
-                  <span className="font-semibold text-gray-900">
-                    Total amount
-                  </span>
+                <div className="mt-4 flex items-end justify-between border-t border-gray-100 pt-4">
+                  <div>
+                    <p className="text-sm font-bold text-gray-900">
+                      Total amount
+                    </p>
 
-                  <span className="text-xl font-bold text-gray-900">
+                    <p className="mt-0.5 text-xs text-gray-400">
+                      Including service fee
+                    </p>
+                  </div>
+
+                  <span className="text-2xl font-bold text-green-600">
                     ৳
                     {totalPrice.toLocaleString(
                       "en-BD"
@@ -1173,41 +1319,82 @@ const Payment = () => {
                 </div>
               </div>
 
+              {/* Pay */}
               <button
                 type="button"
                 disabled={
                   paying || authLoading
                 }
                 onClick={handlePayment}
-                className="mt-7 flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-green-600 text-sm font-semibold text-white transition hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-60"
+                className="group relative mt-7 flex h-13 w-full items-center justify-center gap-2 overflow-hidden rounded-xl bg-green-600 text-sm font-bold text-white shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:bg-green-700 hover:shadow-lg hover:shadow-green-600/20 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:translate-y-0"
               >
+                {!paying && (
+                  <span className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/15 to-transparent transition-transform duration-700 group-hover:translate-x-full" />
+                )}
+
                 {paying ? (
                   <>
                     <Loader2
-                      size={17}
+                      size={18}
                       className="animate-spin"
                     />
-                    Processing...
+                    Processing booking...
                   </>
                 ) : (
                   <>
-                    <LockKeyhole size={17} />
-                    Pay ৳
-                    {totalPrice.toLocaleString(
-                      "en-BD"
-                    )}
+                    <LockKeyhole
+                      size={17}
+                      className="transition-transform duration-300 group-hover:scale-110"
+                    />
+
+                    <span>
+                      Pay ৳
+                      {totalPrice.toLocaleString(
+                        "en-BD"
+                      )}
+                    </span>
+
+                    <ChevronRight
+                      size={17}
+                      className="transition-transform duration-300 group-hover:translate-x-1"
+                    />
                   </>
                 )}
               </button>
 
-              <p className="mt-4 text-center text-xs leading-5 text-gray-400">
-                By continuing, you agree to our
-                booking and cancellation policy.
+              <div className="mt-4 flex items-center justify-center gap-2 text-xs font-medium text-gray-400">
+                <ShieldCheck
+                  size={14}
+                  className="text-green-500"
+                />
+                Secure Khelaro checkout
+              </div>
+
+              <p className="mt-3 text-center text-[11px] leading-5 text-gray-400">
+                By continuing, you agree to our booking
+                and cancellation policy.
               </p>
             </div>
           </aside>
         </div>
       </section>
+
+      {/* Custom animation */}
+      <style>{`
+        @keyframes paymentLoading {
+          0% {
+            transform: translateX(-100%);
+          }
+
+          50% {
+            transform: translateX(100%);
+          }
+
+          100% {
+            transform: translateX(300%);
+          }
+        }
+      `}</style>
     </main>
   );
 };

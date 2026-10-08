@@ -6,12 +6,15 @@ const EmptyState = ({
   action,
 }) => {
   return (
-    <div className="rounded-2xl border border-gray-200 bg-white px-6 py-16 text-center">
-      <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-gray-100">
+    <div className="rounded-2xl border border-gray-200 bg-white px-5 py-14 text-center sm:px-6 sm:py-16">
+      <div
+        aria-hidden="true"
+        className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-gray-100"
+      >
         <SearchX size={24} className="text-gray-400" />
       </div>
 
-      <h3 className="mt-5 font-semibold text-gray-900">
+      <h3 className="mt-5 text-base font-semibold text-gray-900 sm:text-lg">
         {title}
       </h3>
 
@@ -20,7 +23,7 @@ const EmptyState = ({
       </p>
 
       {action && (
-        <div className="mt-5">
+        <div className="mt-6 flex justify-center">
           {action}
         </div>
       )}

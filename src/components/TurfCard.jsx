@@ -13,7 +13,7 @@ import useAuth from "../hooks/useAuth";
 
 const API_URL = (
   import.meta.env.VITE_API_URL || "http://localhost:3000"
-).replace(/\/+$/, "");
+).replace(/\/$/, "");
 
 const FALLBACK_IMAGE =
   "https://placehold.co/800x600?text=No+Turf+Image";
@@ -40,11 +40,8 @@ const TurfCard = ({ turf }) => {
   ).trim();
 
   const turfArea = String(turf?.area || "").trim();
-
   const turfSport = String(turf?.sport || "Sports Turf").trim();
-
   const turfSize = String(turf?.size || "").trim();
-
   const turfSurface = String(turf?.surface || "").trim();
 
   const ratingValue = Number(turf?.rating);
@@ -60,9 +57,7 @@ const TurfCard = ({ turf }) => {
   const priceValue = Number(turf?.price);
 
   const safePrice =
-    Number.isFinite(priceValue) && priceValue >= 0
-      ? priceValue
-      : 0;
+    Number.isFinite(priceValue) && priceValue >= 0 ? priceValue : 0;
 
   const userEmail = currentUser?.email
     ? String(currentUser.email).trim().toLowerCase()
@@ -114,8 +109,6 @@ const TurfCard = ({ turf }) => {
         }
 
         console.error("Wishlist status error:", error);
-
-        // Wishlist failure should not break the turf card.
         setIsWishlisted(false);
       } finally {
         if (!controller.signal.aborted) {
@@ -235,19 +228,24 @@ const TurfCard = ({ turf }) => {
   const isAvailable = turf?.available !== false;
 
   return (
-    <article className="group overflow-hidden rounded-2xl border border-gray-200 bg-white transition-all duration-300 hover:-translate-y-1 hover:border-gray-300 hover:shadow-xl hover:shadow-gray-100">
+    <article className="group relative overflow-hidden rounded-2xl border border-gray-200/80 bg-white shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-gray-300 hover:shadow-xl hover:shadow-gray-200/60">
+      {/* Image */}
       <div className="relative aspect-[4/3] overflow-hidden bg-gray-100">
         <img
           src={turfImage}
           alt={turfName}
           loading="lazy"
           decoding="async"
-          className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
+          className="h-full w-full object-cover transition-transform duration-700 ease-out group-hover:scale-105"
           onError={handleImageError}
         />
 
+        {/* Image overlay */}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/45 via-transparent to-black/10 opacity-70" />
+
+        {/* Top actions */}
         <div className="absolute inset-x-0 top-0 z-20 flex items-start justify-between p-4">
-          <span className="rounded-full bg-white/95 px-3 py-1.5 text-xs font-semibold text-gray-800 shadow-sm backdrop-blur-sm">
+          <span className="rounded-full border border-white/30 bg-white/95 px-3 py-1.5 text-[11px] font-semibold tracking-wide text-gray-800 shadow-sm backdrop-blur-md">
             {turfSport}
           </span>
 
@@ -261,7 +259,7 @@ const TurfCard = ({ turf }) => {
                 : `Add ${turfName} to wishlist`
             }
             aria-pressed={isWishlisted}
-            className={`relative z-30 flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/95 shadow-sm backdrop-blur-sm transition-all duration-200 hover:scale-110 active:scale-90 disabled:cursor-not-allowed disabled:opacity-70 ${
+            className={`relative z-30 flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/40 bg-white/95 shadow-md backdrop-blur-md transition-all duration-200 hover:scale-105 active:scale-90 disabled:cursor-not-allowed disabled:opacity-70 ${
               isWishlisted
                 ? "text-red-500"
                 : "text-gray-600 hover:text-red-500"
@@ -291,8 +289,21 @@ const TurfCard = ({ turf }) => {
           </button>
         </div>
 
+        {/* Availability */}
         <div className="absolute bottom-4 left-4 z-10">
-          <span className="rounded-full bg-gray-950/85 px-3 py-1.5 text-xs font-medium text-white backdrop-blur-sm">
+          <span
+            className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-semibold shadow-sm backdrop-blur-md ${
+              isAvailable
+                ? "bg-gray-950/85 text-white"
+                : "bg-red-950/80 text-red-50"
+            }`}
+          >
+            <span
+              className={`h-1.5 w-1.5 rounded-full ${
+                isAvailable ? "bg-green-400" : "bg-red-400"
+              }`}
+            />
+
             {isAvailable
               ? "Available today"
               : "Currently unavailable"}
@@ -300,11 +311,13 @@ const TurfCard = ({ turf }) => {
         </div>
       </div>
 
-      <div className="p-5">
+      {/* Content */}
+      <div className="p-5 sm:p-5.5">
+        {/* Title + Rating */}
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <h3
-              className="truncate font-semibold text-gray-900"
+              className="truncate text-[15px] font-semibold tracking-tight text-gray-900"
               title={turfName}
             >
               {turfName}
@@ -313,7 +326,7 @@ const TurfCard = ({ turf }) => {
             <div className="mt-2 flex items-center gap-1.5 text-xs text-gray-500">
               <MapPin
                 size={14}
-                className="shrink-0"
+                className="shrink-0 text-gray-400"
                 aria-hidden="true"
               />
 
@@ -326,7 +339,7 @@ const TurfCard = ({ turf }) => {
             </div>
           </div>
 
-          <div className="flex shrink-0 items-center gap-1 rounded-lg bg-amber-50 px-2 py-1 text-xs font-semibold text-amber-700">
+          <div className="flex shrink-0 items-center gap-1 rounded-lg border border-amber-100 bg-amber-50 px-2 py-1 text-xs font-semibold text-amber-700">
             <Star
               size={13}
               fill={hasRating ? "currentColor" : "none"}
@@ -339,38 +352,42 @@ const TurfCard = ({ turf }) => {
           </div>
         </div>
 
+        {/* Meta */}
         {(turfArea || turfSize || turfSurface) && (
-          <div className="mt-4 flex flex-wrap gap-2">
+          <div className="mt-4 flex flex-wrap gap-1.5">
             {turfArea && (
-              <span className="rounded-md bg-gray-50 px-2 py-1 text-[11px] text-gray-500">
+              <span className="rounded-md border border-gray-100 bg-gray-50 px-2 py-1 text-[10px] font-medium text-gray-500">
                 {turfArea}
               </span>
             )}
 
             {turfSize && (
-              <span className="rounded-md bg-gray-50 px-2 py-1 text-[11px] text-gray-500">
+              <span className="rounded-md border border-gray-100 bg-gray-50 px-2 py-1 text-[10px] font-medium text-gray-500">
                 {turfSize}
               </span>
             )}
 
             {turfSurface && (
-              <span className="rounded-md bg-gray-50 px-2 py-1 text-[11px] text-gray-500">
+              <span className="rounded-md border border-gray-100 bg-gray-50 px-2 py-1 text-[10px] font-medium text-gray-500">
                 {turfSurface}
               </span>
             )}
           </div>
         )}
 
-        <div className="my-4 border-t border-gray-100" />
+        {/* Divider */}
+        <div className="my-5 border-t border-gray-100" />
 
+        {/* Footer */}
         <div className="flex items-end justify-between gap-4">
           <div>
-            <p className="text-xs text-gray-400">
+            <p className="text-[11px] font-medium text-gray-400">
               Starting from
             </p>
 
-            <p className="mt-1 text-lg font-bold text-gray-900">
+            <p className="mt-1 text-lg font-bold tracking-tight text-gray-900">
               ৳{safePrice.toLocaleString("en-BD")}
+
               <span className="ml-1 text-xs font-normal text-gray-400">
                 / hour
               </span>
@@ -381,18 +398,18 @@ const TurfCard = ({ turf }) => {
             <Link
               to={`/turfs/${encodeURIComponent(detailsId)}`}
               aria-label={`View details for ${turfName}`}
-              className="group/link inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-gray-900 px-3.5 py-2.5 text-xs font-semibold text-white transition-all duration-200 hover:bg-green-600"
+              className="group/link inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-gray-900 px-3.5 py-2.5 text-xs font-semibold text-white shadow-sm transition-all duration-200 hover:bg-green-600 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2"
             >
               View details
 
               <ArrowUpRight
                 size={14}
-                className="transition-transform group-hover/link:-translate-y-0.5 group-hover/link:translate-x-0.5"
+                className="transition-transform duration-200 group-hover/link:-translate-y-0.5 group-hover/link:translate-x-0.5"
                 aria-hidden="true"
               />
             </Link>
           ) : (
-            <span className="inline-flex shrink-0 cursor-not-allowed items-center gap-1.5 rounded-lg bg-gray-200 px-3.5 py-2.5 text-xs font-semibold text-gray-400">
+            <span className="inline-flex shrink-0 cursor-not-allowed items-center gap-1.5 rounded-lg bg-gray-100 px-3.5 py-2.5 text-xs font-semibold text-gray-400">
               Details unavailable
             </span>
           )}

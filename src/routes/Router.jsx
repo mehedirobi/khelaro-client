@@ -1,33 +1,39 @@
 import { createBrowserRouter } from "react-router-dom";
 
+// Layouts
 import MainLayout from "../layouts/MainLayout";
 import DashboardLayout from "../layouts/DashboardLayout";
 import OwnerDashboardLayout from "../layouts/OwnerDashboardLayout";
+import AdminDashboardLayout from "../layouts/AdminDashboardLayout";
 
+// Main pages
 import Home from "../components/Home";
 import Turf from "../components/Turf";
-
-import Login from "../pages/Login";
-import Register from "../pages/Register";
 import About from "../pages/About";
 import Contact from "../pages/Contact";
+import Login from "../pages/Login";
+import Register from "../pages/Register";
+import NotFound from "../pages/NotFound";
 
+// Turf & booking pages
 import TurfDetails from "../pages/TurfDetails";
 import BookingSection from "../pages/BookingSection";
 import BookingConfirmation from "../pages/BookingConfirmation";
+import BookingDetails from "../dashboard/BookingDetails";
 import Payment from "../pages/Payment";
 import BookingSuccess from "../pages/BookingSuccess";
 
+// Route guards
 import PrivateRoute from "../routes/PrivateRoute";
 import RoleRoute from "../routes/RoleRoute";
 
-// Customer Dashboard
+// Customer dashboard
 import DashboardOverview from "../dashboard/DashboardOverview";
 import MyBookings from "../dashboard/MyBookings";
 import Wishlist from "../dashboard/Wishlist";
 import Profile from "../dashboard/Profile";
 
-// Owner Dashboard
+// Owner dashboard
 import OwnerDashboard from "../dashboard/OwnerDashboard";
 import AddTurf from "../dashboard/AddTurf";
 import MyTurfs from "../dashboard/MyTurfs";
@@ -35,10 +41,7 @@ import OwnerBookings from "../dashboard/OwnerBookings";
 import OwnerRevenue from "../dashboard/OwnerRevenue";
 import OwnerProfile from "../dashboard/OwnerProfile";
 
-import NotFound from "../pages/NotFound";
-
-import AdminDashboardLayout from "../layouts/AdminDashboardLayout";
-
+// Admin dashboard
 import AdminDashboard from "../dashboard/AdminDashboard";
 import AdminUsers from "../dashboard/AdminUsers";
 import AdminOwners from "../dashboard/AdminOwners";
@@ -47,13 +50,10 @@ import AdminBookings from "../dashboard/AdminBookings";
 import AdminRevenue from "../dashboard/AdminRevenue";
 import AdminProfile from "../dashboard/AdminProfile";
 
-
-import BookingDetails from "../dashboard/BookingDetails";
-
 const router = createBrowserRouter([
-  // ========================================
+  // ==================================================
   // MAIN WEBSITE
-  // ========================================
+  // ==================================================
   {
     path: "/",
     element: <MainLayout />,
@@ -68,27 +68,22 @@ const router = createBrowserRouter([
         path: "login",
         element: <Login />,
       },
-
       {
         path: "register",
         element: <Register />,
       },
 
-      // Turfs
+      // Public turf pages
       {
         path: "turfs",
         element: <Turf />,
       },
-
       {
-        path: "turfs/:turfId",
+        path: "turfs/:id",
         element: <TurfDetails />,
       },
 
-      // ========================================
-      // BOOKING ROUTES - LOGIN REQUIRED
-      // ========================================
-
+      // Booking
       {
         path: "turfs/:id/book",
         element: (
@@ -96,10 +91,6 @@ const router = createBrowserRouter([
             <BookingSection />
           </PrivateRoute>
         ),
-      },
-      {
-        path: "/dashboard/bookings/:id",
-        element: <BookingDetails />
       },
 
       {
@@ -129,12 +120,11 @@ const router = createBrowserRouter([
         ),
       },
 
-      // Other pages
+      // Other public pages
       {
         path: "about",
         element: <About />,
       },
-
       {
         path: "contact",
         element: <Contact />,
@@ -142,18 +132,16 @@ const router = createBrowserRouter([
     ],
   },
 
-  // ========================================
+  // ==================================================
   // CUSTOMER DASHBOARD
-  // ========================================
+  // ==================================================
   {
     path: "/dashboard",
-
     element: (
       <RoleRoute allowedRoles={["user"]}>
         <DashboardLayout />
       </RoleRoute>
     ),
-
     children: [
       {
         index: true,
@@ -163,6 +151,11 @@ const router = createBrowserRouter([
       {
         path: "bookings",
         element: <MyBookings />,
+      },
+
+      {
+        path: "bookings/:id",
+        element: <BookingDetails />,
       },
 
       {
@@ -177,50 +170,42 @@ const router = createBrowserRouter([
     ],
   },
 
-  // ========================================
+  // ==================================================
   // OWNER DASHBOARD
-  // ========================================
+  // ==================================================
   {
     path: "/owner-dashboard",
-
     element: (
       <RoleRoute allowedRoles={["owner"]}>
         <OwnerDashboardLayout />
       </RoleRoute>
     ),
-
     children: [
-      // Owner Overview
       {
         index: true,
         element: <OwnerDashboard />,
       },
 
-      // My Turfs
       {
         path: "turfs",
         element: <MyTurfs />,
       },
 
-      // Add Turf
       {
         path: "add-turf",
         element: <AddTurf />,
       },
 
-      // Customer Bookings
       {
         path: "bookings",
         element: <OwnerBookings />,
       },
 
-      // Revenue
       {
         path: "revenue",
         element: <OwnerRevenue />,
       },
 
-      // Owner Profile
       {
         path: "profile",
         element: <OwnerProfile />,
@@ -228,49 +213,57 @@ const router = createBrowserRouter([
     ],
   },
 
-  //admin dashboard
+  // ==================================================
+  // ADMIN DASHBOARD
+  // ==================================================
   {
-  path: "/admin-dashboard",
-  element: (
-    <RoleRoute allowedRoles={["admin"]}>
-      <AdminDashboardLayout />
-    </RoleRoute>
-  ),
-  children: [
-    {
-      index: true,
-      element: <AdminDashboard />,
-    },
-    {
-      path: "users",
-      element: <AdminUsers />,
-    },
-    {
-      path: "owners",
-      element: <AdminOwners />,
-    },
-    {
-      path: "turfs",
-      element: <AdminTurfs />,
-    },
-    {
-      path: "bookings",
-      element: <AdminBookings />,
-    },
-    {
-      path: "revenue",
-      element: <AdminRevenue />,
-    },
-    {
-      path: "profile",
-      element: <AdminProfile />,
-    },
-  ],
-},
+    path: "/admin-dashboard",
+    element: (
+      <RoleRoute allowedRoles={["admin"]}>
+        <AdminDashboardLayout />
+      </RoleRoute>
+    ),
+    children: [
+      {
+        index: true,
+        element: <AdminDashboard />,
+      },
 
-  // ========================================
+      {
+        path: "users",
+        element: <AdminUsers />,
+      },
+
+      {
+        path: "owners",
+        element: <AdminOwners />,
+      },
+
+      {
+        path: "turfs",
+        element: <AdminTurfs />,
+      },
+
+      {
+        path: "bookings",
+        element: <AdminBookings />,
+      },
+
+      {
+        path: "revenue",
+        element: <AdminRevenue />,
+      },
+
+      {
+        path: "profile",
+        element: <AdminProfile />,
+      },
+    ],
+  },
+
+  // ==================================================
   // 404
-  // ========================================
+  // ==================================================
   {
     path: "*",
     element: <NotFound />,

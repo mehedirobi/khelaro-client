@@ -6,8 +6,8 @@ const DashboardLayout = () => {
     <div className="min-h-screen bg-gray-100">
       <DashboardSidebar />
 
-      <main className="min-h-screen lg:ml-64">
-        <div className="p-4 sm:p-6 lg:p-8">
+      <main className="min-h-screen overflow-x-hidden lg:ml-64">
+        <div className="mx-auto w-full max-w-[1600px] p-4 sm:p-6 lg:p-8">
           <Outlet />
         </div>
       </main>

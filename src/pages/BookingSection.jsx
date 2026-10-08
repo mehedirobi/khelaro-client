@@ -12,8 +12,8 @@ import {
   Loader2,
   RefreshCw,
   ChevronDown,
+  ShieldCheck,
 } from "lucide-react";
-import { turfs } from "../data/turfs";
 
 const API_URL = (
   import.meta.env.VITE_API_URL || "http://localhost:3000"
@@ -55,22 +55,14 @@ const MONTHS = [
   "December",
 ];
 
-const getTodayDate = () => {
+const getTodayString = () => {
   const now = new Date();
 
-  return {
-    year: now.getFullYear(),
-    month: now.getMonth() + 1,
-    day: now.getDate(),
-  };
-};
-
-const getTodayString = () => {
-  const { year, month, day } = getTodayDate();
-
-  return `${year}-${String(month).padStart(2, "0")}-${String(
-    day
-  ).padStart(2, "0")}`;
+  return [
+    now.getFullYear(),
+    String(now.getMonth() + 1).padStart(2, "0"),
+    String(now.getDate()).padStart(2, "0"),
+  ].join("-");
 };
 
 const formatDate = (date) => {
@@ -87,21 +79,8 @@ const formatDate = (date) => {
   return `${day}-${month}-${year}`;
 };
 
-const buildDateString = (year, month, day) => {
-  if (!year || !month || !day) {
-    return "";
-  }
-
-  return `${String(year)}-${String(month).padStart(
-    2,
-    "0"
-  )}-${String(day).padStart(2, "0")}`;
-};
-
 const getDaysInMonth = (year, month) => {
-  if (!year || !month) {
-    return 31;
-  }
+  if (!year || !month) return 31;
 
   return new Date(
     Number(year),
@@ -110,16 +89,17 @@ const getDaysInMonth = (year, month) => {
   ).getDate();
 };
 
-const isDateBeforeToday = (dateString) => {
-  if (!dateString) return false;
+const buildDateString = (year, month, day) => {
+  if (!year || !month || !day) return "";
 
-  return dateString < getTodayString();
+  return `${year}-${String(month).padStart(
+    2,
+    "0"
+  )}-${String(day).padStart(2, "0")}`;
 };
 
 const convertToMinutes = (time) => {
-  if (!time) {
-    return -1;
-  }
+  if (!time) return -1;
 
   const value = String(time).trim().toUpperCase();
 
@@ -127,17 +107,13 @@ const convertToMinutes = (time) => {
     /^(\d{1,2}):(\d{2})\s*(AM|PM)$/
   );
 
-  if (!match) {
-    return -1;
-  }
+  if (!match) return -1;
 
   let hours = Number(match[1]);
   const minutes = Number(match[2]);
   const period = match[3];
 
   if (
-    !Number.isInteger(hours) ||
-    !Number.isInteger(minutes) ||
     hours < 1 ||
     hours > 12 ||
     minutes < 0 ||
@@ -158,24 +134,21 @@ const convertToMinutes = (time) => {
 };
 
 const convertToBackendTime = (time) => {
-  const totalMinutes = convertToMinutes(time);
+  const minutes = convertToMinutes(time);
 
-  if (totalMinutes < 0) {
-    return "";
-  }
+  if (minutes < 0) return "";
 
-  const hours24 = Math.floor(totalMinutes / 60);
-  const minutes = totalMinutes % 60;
+  const hours = Math.floor(minutes / 60);
+  const mins = minutes % 60;
 
-  return `${String(hours24).padStart(2, "0")}:${String(
-    minutes
-  ).padStart(2, "0")}`;
+  return `${String(hours).padStart(
+    2,
+    "0"
+  )}:${String(mins).padStart(2, "0")}`;
 };
 
 const normalizeTime = (time) => {
-  if (!time) {
-    return "";
-  }
+  if (!time) return "";
 
   const value = String(time).trim().toUpperCase();
 
@@ -183,41 +156,39 @@ const normalizeTime = (time) => {
     /^(\d{1,2}):(\d{2})\s*(AM|PM)$/
   );
 
-  if (!match) {
-    return value;
-  }
+  if (!match) return value;
 
   const hours = Number(match[1]) % 12 || 12;
-  const minutes = match[2];
-  const period = match[3];
 
-  return `${String(hours).padStart(2, "0")}:${minutes} ${period}`;
+  return `${String(hours).padStart(
+    2,
+    "0"
+  )}:${match[2]} ${match[3]}`;
 };
 
 const getNextTime = (time) => {
   const totalMinutes = convertToMinutes(time);
 
-  if (totalMinutes < 0) {
-    return "";
-  }
+  if (totalMinutes < 0) return "";
 
   const nextMinutes = totalMinutes + 60;
-
   const hours24 = Math.floor(nextMinutes / 60) % 24;
   const minutes = nextMinutes % 60;
 
   const period = hours24 >= 12 ? "PM" : "AM";
   const hours12 = hours24 % 12 || 12;
 
-  return `${String(hours12).padStart(2, "0")}:${String(
-    minutes
-  ).padStart(2, "0")} ${period}`;
+  return `${String(hours12).padStart(
+    2,
+    "0"
+  )}:${String(minutes).padStart(
+    2,
+    "0"
+  )} ${period}`;
 };
 
 const getBookingList = (data) => {
-  if (Array.isArray(data)) {
-    return data;
-  }
+  if (Array.isArray(data)) return data;
 
   if (Array.isArray(data?.bookings)) {
     return data.bookings;
@@ -230,110 +201,181 @@ const getBookingList = (data) => {
   return [];
 };
 
+const getTurfId = (turf) => {
+  return String(
+    turf?._id ||
+      turf?.id ||
+      ""
+  ).trim();
+};
+
+const getTurfIdentifier = (turf) => {
+  return String(
+    turf?._id ||
+      turf?.id ||
+      turf?.slug ||
+      ""
+  ).trim();
+};
+
 const BookingSection = () => {
-  const { turfId: routeTurfId, id: routeId } = useParams();
+  const { turfId: routeTurfId, id: routeId } =
+    useParams();
 
-  const rawIdentifier = routeTurfId || routeId || "";
-
-  const turfIdentifier = decodeURIComponent(
-    String(rawIdentifier)
+  const routeIdentifier = decodeURIComponent(
+    String(routeTurfId || routeId || "")
   ).trim();
 
-  const today = useMemo(() => getTodayString(), []);
+  const today = useMemo(
+    () => getTodayString(),
+    []
+  );
 
-  const todayParts = useMemo(() => {
-    const [year, month, day] = today.split("-");
+  const currentYear = Number(
+    today.split("-")[0]
+  );
 
-    return {
-      year,
-      month,
-      day,
-    };
-  }, [today]);
-
-  const currentYear = Number(todayParts.year);
-
-  const yearOptions = useMemo(() => {
-    return Array.from(
-      { length: 3 },
-      (_, index) => currentYear + index
-    );
-  }, [currentYear]);
+  const yearOptions = useMemo(
+    () =>
+      Array.from(
+        { length: 3 },
+        (_, index) => currentYear + index
+      ),
+    [currentYear]
+  );
 
   const [turf, setTurf] = useState(null);
-
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  /*
-   * Keep day, month and year separate.
-   * This is important because the user can select
-   * them in any order without resetting previous values.
-   */
   const [selectedDay, setSelectedDay] = useState("");
-  const [selectedMonth, setSelectedMonth] = useState("");
-  const [selectedYear, setSelectedYear] = useState("");
+  const [selectedMonth, setSelectedMonth] =
+    useState("");
+  const [selectedYear, setSelectedYear] =
+    useState("");
 
-  const [selectedSlot, setSelectedSlot] = useState("");
+  const [selectedSlot, setSelectedSlot] =
+    useState("");
 
   const [bookings, setBookings] = useState([]);
+
   const [availabilityLoading, setAvailabilityLoading] =
     useState(false);
+
   const [availabilityError, setAvailabilityError] =
     useState("");
 
   const [retryKey, setRetryKey] = useState(0);
 
-  /*
-   * Find turf from local data.
-   *
-   * Supports:
-   * - turf-001
-   * - green-field-sports-arena
-   */
   useEffect(() => {
-    if (!turfIdentifier) {
-      setTurf(null);
-      setError("Invalid turf ID.");
-      setLoading(false);
-      return;
-    }
+    const controller = new AbortController();
 
-    setLoading(true);
-    setError("");
+    const fetchTurf = async () => {
+      if (!routeIdentifier) {
+        setError("Invalid turf ID.");
+        setLoading(false);
+        return;
+      }
 
-    const decodedIdentifier = turfIdentifier.toLowerCase();
+      try {
+        setLoading(true);
+        setError("");
 
-    const foundTurf = turfs.find((item) => {
-      const itemId = String(item?.id || "")
-        .trim()
-        .toLowerCase();
+        const response = await fetch(
+          `${API_URL}/turfs`,
+          {
+            signal: controller.signal,
+          }
+        );
 
-      const itemSlug = String(item?.slug || "")
-        .trim()
-        .toLowerCase();
+        const data = await response
+          .json()
+          .catch(() => []);
 
-      return (
-        itemId === decodedIdentifier ||
-        itemSlug === decodedIdentifier
-      );
-    });
+        if (!response.ok) {
+          throw new Error(
+            data?.message ||
+              "Failed to load turfs."
+          );
+        }
 
-    if (!foundTurf) {
-      setTurf(null);
-      setError("The selected turf was not found.");
-      setLoading(false);
-      return;
-    }
+        const turfList = Array.isArray(data)
+          ? data
+          : Array.isArray(data?.turfs)
+          ? data.turfs
+          : Array.isArray(data?.data)
+          ? data.data
+          : [];
 
-    setTurf(foundTurf);
-    setLoading(false);
-  }, [turfIdentifier]);
+        const normalizedIdentifier =
+          routeIdentifier.toLowerCase();
 
-  /*
-   * Build complete backend date only when
-   * Day + Month + Year are all selected.
-   */
+        const foundTurf = turfList.find(
+          (item) => {
+            const mongoId = String(
+              item?._id || ""
+            )
+              .trim()
+              .toLowerCase();
+
+            const customId = String(
+              item?.id || ""
+            )
+              .trim()
+              .toLowerCase();
+
+            const slug = String(
+              item?.slug || ""
+            )
+              .trim()
+              .toLowerCase();
+
+            return (
+              mongoId === normalizedIdentifier ||
+              customId === normalizedIdentifier ||
+              slug === normalizedIdentifier
+            );
+          }
+        );
+
+        if (!foundTurf) {
+          throw new Error(
+            "The selected turf was not found."
+          );
+        }
+
+        if (!getTurfId(foundTurf)) {
+          throw new Error(
+            "This turf does not have a valid MongoDB ID."
+          );
+        }
+
+        setTurf(foundTurf);
+      } catch (err) {
+        if (err.name === "AbortError") return;
+
+        console.error(
+          "Failed to load turf:",
+          err
+        );
+
+        setTurf(null);
+        setError(
+          err?.message ||
+            "Failed to load turf."
+        );
+      } finally {
+        if (!controller.signal.aborted) {
+          setLoading(false);
+        }
+      }
+    };
+
+    fetchTurf();
+
+    return () => controller.abort();
+  }, [routeIdentifier]);
+
   const selectedDate = useMemo(() => {
     if (
       !selectedYear ||
@@ -363,11 +405,11 @@ const BookingSection = () => {
     selectedDay,
   ]);
 
-  /*
-   * Calculate valid days for selected month/year.
-   */
   const availableDays = useMemo(() => {
-    if (!selectedYear || !selectedMonth) {
+    if (
+      !selectedYear ||
+      !selectedMonth
+    ) {
       return 31;
     }
 
@@ -375,25 +417,26 @@ const BookingSection = () => {
       Number(selectedYear),
       Number(selectedMonth)
     );
-  }, [selectedYear, selectedMonth]);
+  }, [
+    selectedYear,
+    selectedMonth,
+  ]);
 
-  const dayOptions = useMemo(() => {
-    return Array.from(
-      { length: availableDays },
-      (_, index) => index + 1
-    );
-  }, [availableDays]);
+  const dayOptions = useMemo(
+    () =>
+      Array.from(
+        { length: availableDays },
+        (_, index) => index + 1
+      ),
+    [availableDays]
+  );
 
-  /*
-   * If current selected day becomes invalid after
-   * changing month/year, adjust it automatically.
-   *
-   * Example:
-   * 31 January -> February
-   * becomes 28 February.
-   */
   useEffect(() => {
-    if (!selectedYear || !selectedMonth || !selectedDay) {
+    if (
+      !selectedYear ||
+      !selectedMonth ||
+      !selectedDay
+    ) {
       return;
     }
 
@@ -403,7 +446,9 @@ const BookingSection = () => {
     );
 
     if (Number(selectedDay) > maxDays) {
-      setSelectedDay(String(maxDays).padStart(2, "0"));
+      setSelectedDay(
+        String(maxDays).padStart(2, "0")
+      );
     }
   }, [
     selectedYear,
@@ -411,17 +456,10 @@ const BookingSection = () => {
     selectedDay,
   ]);
 
-  /*
-   * Reset selected slot when the complete date changes.
-   */
   useEffect(() => {
     setSelectedSlot("");
   }, [selectedDate]);
 
-  /*
-   * Load availability only after a complete date
-   * has been selected.
-   */
   useEffect(() => {
     const controller = new AbortController();
 
@@ -433,7 +471,7 @@ const BookingSection = () => {
         return;
       }
 
-      if (isDateBeforeToday(selectedDate)) {
+      if (selectedDate < today) {
         setBookings([]);
         setAvailabilityError(
           "Please select today or a future date."
@@ -442,14 +480,12 @@ const BookingSection = () => {
         return;
       }
 
-      const backendTurfId = String(
-        turf.id || turf._id || ""
-      ).trim();
+      const mongoTurfId = getTurfId(turf);
 
-      if (!backendTurfId) {
+      if (!mongoTurfId) {
         setBookings([]);
         setAvailabilityError(
-          "Turf ID is missing."
+          "MongoDB turf ID is missing."
         );
         setAvailabilityLoading(false);
         return;
@@ -459,19 +495,17 @@ const BookingSection = () => {
         setAvailabilityLoading(true);
         setAvailabilityError("");
 
-        const url =
-          `${API_URL}/bookings/availability` +
-          `?turfId=${encodeURIComponent(
-            backendTurfId
-          )}` +
-          `&date=${encodeURIComponent(
-            selectedDate
-          )}`;
-
-        const response = await fetch(url, {
-          method: "GET",
-          signal: controller.signal,
+        const params = new URLSearchParams({
+          turfId: mongoTurfId,
+          date: selectedDate,
         });
+
+        const response = await fetch(
+          `${API_URL}/bookings/availability?${params}`,
+          {
+            signal: controller.signal,
+          }
+        );
 
         const data = await response
           .json()
@@ -480,14 +514,15 @@ const BookingSection = () => {
         if (!response.ok) {
           throw new Error(
             data?.message ||
-              "Failed to load available slots."
+              "Failed to load availability."
           );
         }
 
-        const bookingList = getBookingList(data);
+        const bookingList =
+          getBookingList(data);
 
-        const activeBookings = bookingList.filter(
-          (booking) => {
+        const activeBookings =
+          bookingList.filter((booking) => {
             const status = String(
               booking?.status || ""
             ).toLowerCase();
@@ -496,25 +531,21 @@ const BookingSection = () => {
               status === "pending" ||
               status === "confirmed"
             );
-          }
-        );
+          });
 
         setBookings(activeBookings);
       } catch (err) {
-        if (err.name === "AbortError") {
-          return;
-        }
+        if (err.name === "AbortError") return;
 
         console.error(
-          "Failed to load booking availability:",
+          "Failed to load availability:",
           err
         );
 
         setBookings([]);
-
         setAvailabilityError(
           err?.message ||
-            "Failed to load available slots."
+            "Failed to load availability."
         );
       } finally {
         if (!controller.signal.aborted) {
@@ -525,52 +556,41 @@ const BookingSection = () => {
 
     fetchAvailability();
 
-    return () => {
-      controller.abort();
-    };
+    return () => controller.abort();
   }, [
     turf,
     selectedDate,
+    today,
     retryKey,
   ]);
 
-  /*
-   * Date selection handlers.
-   *
-   * Important:
-   * We NEVER clear the other date fields here.
-   */
   const handleDayChange = (event) => {
-    const value = event.target.value;
-
-    setSelectedDay(value);
+    setSelectedDay(event.target.value);
     setAvailabilityError("");
   };
 
   const handleMonthChange = (event) => {
-    const value = event.target.value;
-
-    setSelectedMonth(value);
+    setSelectedMonth(event.target.value);
     setAvailabilityError("");
   };
 
   const handleYearChange = (event) => {
-    const value = event.target.value;
-
-    setSelectedYear(value);
+    setSelectedYear(event.target.value);
     setAvailabilityError("");
   };
 
   if (loading) {
     return (
-      <main className="flex min-h-[70vh] items-center justify-center bg-gray-50 px-4">
-        <div className="text-center">
-          <Loader2
-            size={30}
-            className="mx-auto animate-spin text-green-600"
-          />
+      <main className="flex min-h-screen items-center justify-center bg-gray-50">
+        <div className="animate-[fadeIn_0.4s_ease-out] text-center">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-green-50">
+            <Loader2
+              size={28}
+              className="animate-spin text-green-600"
+            />
+          </div>
 
-          <p className="mt-4 text-sm text-gray-500">
+          <p className="mt-4 text-sm font-medium text-gray-500">
             Loading turf...
           </p>
         </div>
@@ -581,10 +601,10 @@ const BookingSection = () => {
   if (error || !turf) {
     return (
       <main className="flex min-h-[70vh] items-center justify-center bg-gray-50 px-4">
-        <div className="max-w-md text-center">
-          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-red-50">
+        <div className="animate-[fadeInUp_0.45s_ease-out] max-w-md text-center">
+          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-red-50">
             <AlertCircle
-              size={26}
+              size={28}
               className="text-red-500"
             />
           </div>
@@ -598,13 +618,13 @@ const BookingSection = () => {
               "The turf you are trying to book does not exist."}
           </p>
 
-          <div className="mt-6 flex flex-col justify-center gap-3 sm:flex-row">
+          <div className="mt-7 flex flex-col gap-3 sm:flex-row sm:justify-center">
             <button
               type="button"
               onClick={() =>
                 window.location.reload()
               }
-              className="inline-flex items-center justify-center gap-2 rounded-xl bg-gray-900 px-5 py-3 text-sm font-semibold text-white transition hover:bg-gray-800"
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-gray-900 px-5 py-3 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-gray-800"
             >
               <RefreshCw size={16} />
               Try again
@@ -612,7 +632,7 @@ const BookingSection = () => {
 
             <Link
               to="/turfs"
-              className="inline-flex items-center justify-center gap-2 rounded-xl bg-green-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-green-700"
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-green-600 px-5 py-3 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-green-700"
             >
               <ArrowLeft size={17} />
               Back to Turfs
@@ -643,18 +663,6 @@ const BookingSection = () => {
     turf.sport || "Sports Turf"
   ).trim();
 
-  const ratingValue = Number(turf.rating);
-
-  const hasRating =
-    turf.rating !== undefined &&
-    turf.rating !== null &&
-    turf.rating !== "" &&
-    Number.isFinite(ratingValue);
-
-  const turfRating = hasRating
-    ? ratingValue.toFixed(1)
-    : "New";
-
   const turfSize = String(
     turf.size || "Standard"
   ).trim();
@@ -670,6 +678,18 @@ const BookingSection = () => {
     priceValue >= 0
       ? priceValue
       : 0;
+
+  const ratingValue = Number(turf.rating);
+
+  const hasRating =
+    turf.rating !== undefined &&
+    turf.rating !== null &&
+    turf.rating !== "" &&
+    Number.isFinite(ratingValue);
+
+  const turfRating = hasRating
+    ? ratingValue.toFixed(1)
+    : "New";
 
   const openingTime = normalizeTime(
     turf.openingTime || "08:00 AM"
@@ -687,15 +707,13 @@ const BookingSection = () => {
 
   const isToday = selectedDate === today;
 
-  /*
-   * Check turf operating hours.
-   */
-  const isWithinOperatingHours = (slot) => {
-    const slotStart = convertToMinutes(slot);
+  const isWithinOperatingHours = (
+    slot
+  ) => {
+    const slotStart =
+      convertToMinutes(slot);
 
-    if (slotStart < 0) {
-      return false;
-    }
+    if (slotStart < 0) return false;
 
     const slotEnd = slotStart + 60;
 
@@ -706,36 +724,28 @@ const BookingSection = () => {
       return true;
     }
 
-    if (closingMinutes > openingMinutes) {
+    if (
+      closingMinutes > openingMinutes
+    ) {
       return (
         slotStart >= openingMinutes &&
         slotEnd <= closingMinutes
       );
     }
 
-    /*
-     * Overnight turf hours.
-     * Example: 06:00 PM - 02:00 AM.
-     */
     return (
       slotStart >= openingMinutes ||
       slotEnd <= closingMinutes
     );
   };
 
-  /*
-   * Disable already-passed slots for today.
-   */
   const isPastSlot = (slot) => {
-    if (!isToday) {
-      return false;
-    }
+    if (!isToday) return false;
 
-    const slotStart = convertToMinutes(slot);
+    const slotStart =
+      convertToMinutes(slot);
 
-    if (slotStart < 0) {
-      return true;
-    }
+    if (slotStart < 0) return true;
 
     const now = new Date();
 
@@ -746,34 +756,32 @@ const BookingSection = () => {
     return slotStart <= currentMinutes;
   };
 
-  /*
-   * Check existing booking overlap.
-   */
   const isSlotBooked = (slot) => {
-    const slotStart = convertToMinutes(slot);
+    const slotStart =
+      convertToMinutes(slot);
 
-    if (slotStart < 0) {
-      return false;
-    }
+    if (slotStart < 0) return false;
 
     const slotEnd = slotStart + 60;
 
     return bookings.some((booking) => {
-      const bookingStart = convertToMinutes(
-        normalizeTime(
-          booking?.startTime ||
-            booking?.start ||
-            ""
-        )
-      );
+      const bookingStart =
+        convertToMinutes(
+          normalizeTime(
+            booking?.startTime ||
+              booking?.start ||
+              ""
+          )
+        );
 
-      const bookingEnd = convertToMinutes(
-        normalizeTime(
-          booking?.endTime ||
-            booking?.end ||
-            ""
-        )
-      );
+      const bookingEnd =
+        convertToMinutes(
+          normalizeTime(
+            booking?.endTime ||
+              booking?.end ||
+              ""
+          )
+        );
 
       if (
         bookingStart < 0 ||
@@ -790,7 +798,9 @@ const BookingSection = () => {
   };
 
   const getSlotStatus = (slot) => {
-    if (!isWithinOperatingHours(slot)) {
+    if (
+      !isWithinOperatingHours(slot)
+    ) {
       return "closed";
     }
 
@@ -824,17 +834,11 @@ const BookingSection = () => {
       backendEndTime
   );
 
-  /*
-   * Use local turf ID.
-   * Example: turf-001
-   */
-  const bookingTurfId = String(
-    turf.id || turf._id || turfIdentifier
-  ).trim();
+  const mongoTurfId = getTurfId(turf);
 
   const bookingUrl = bookingReady
     ? `/booking/${encodeURIComponent(
-        bookingTurfId
+        mongoTurfId
       )}?date=${encodeURIComponent(
         selectedDate
       )}&slot=${encodeURIComponent(
@@ -848,33 +852,99 @@ const BookingSection = () => {
       selectedYear
   );
 
+  const availableSlotCount = selectedDate
+    ? TIME_SLOTS.filter(
+        (slot) =>
+          getSlotStatus(slot) ===
+          "available"
+      ).length
+    : 0;
+
   return (
     <main className="min-h-screen bg-gray-50">
-      {/* Back navigation */}
+      <style>{`
+        @keyframes fadeIn {
+          from {
+            opacity: 0;
+          }
+          to {
+            opacity: 1;
+          }
+        }
+
+        @keyframes fadeInUp {
+          from {
+            opacity: 0;
+            transform: translateY(18px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+
+        @keyframes scaleIn {
+          from {
+            opacity: 0;
+            transform: scale(0.96);
+          }
+          to {
+            opacity: 1;
+            transform: scale(1);
+          }
+        }
+
+        @keyframes slideIn {
+          from {
+            opacity: 0;
+            transform: translateX(10px);
+          }
+          to {
+            opacity: 1;
+            transform: translateX(0);
+          }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+          *,
+          *::before,
+          *::after {
+            animation-duration: 0.01ms !important;
+            animation-iteration-count: 1 !important;
+            transition-duration: 0.01ms !important;
+            scroll-behavior: auto !important;
+          }
+        }
+      `}</style>
+
+      {/* Header */}
       <section className="border-b border-gray-200 bg-white">
         <div className="mx-auto max-w-7xl px-4 py-5 sm:px-6 lg:px-8">
           <Link
             to={`/turfs/${encodeURIComponent(
-              turfIdentifier
+              getTurfIdentifier(turf)
             )}`}
-            className="inline-flex items-center gap-2 text-sm font-medium text-gray-500 transition hover:text-green-600"
+            className="group inline-flex items-center gap-2 text-sm font-medium text-gray-500 transition hover:text-green-600"
           >
-            <ArrowLeft size={16} />
+            <ArrowLeft
+              size={16}
+              className="transition-transform group-hover:-translate-x-1"
+            />
             Back to turf details
           </Link>
         </div>
       </section>
 
       <section className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 lg:py-10">
-        <div className="grid gap-8 lg:grid-cols-[1fr_420px]">
+        <div className="grid gap-8 lg:grid-cols-[1fr_430px]">
           {/* Turf information */}
-          <div>
-            <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white">
-              <div className="relative h-64 sm:h-80">
+          <div className="animate-[fadeInUp_0.55s_ease-out]">
+            <div className="overflow-hidden rounded-3xl border border-gray-200 bg-white shadow-sm">
+              <div className="group relative h-64 overflow-hidden sm:h-80 lg:h-[390px]">
                 <img
                   src={turfImage}
                   alt={turfName}
-                  className="h-full w-full object-cover"
+                  className="h-full w-full object-cover transition duration-700 group-hover:scale-[1.03]"
                   onError={(event) => {
                     if (
                       event.currentTarget.src !==
@@ -886,35 +956,29 @@ const BookingSection = () => {
                   }}
                 />
 
-                <div className="absolute left-4 top-4">
-                  <span className="rounded-full bg-white/95 px-3 py-1.5 text-xs font-semibold text-gray-800 shadow-sm">
+                <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-black/10" />
+
+                <div className="absolute left-5 top-5">
+                  <span className="rounded-full border border-white/20 bg-black/40 px-3 py-1.5 text-xs font-semibold text-white backdrop-blur-md">
                     {turfSport}
                   </span>
                 </div>
-              </div>
 
-              <div className="p-6 sm:p-8">
-                <div className="flex flex-wrap items-start justify-between gap-4">
-                  <div className="min-w-0">
-                    <h1 className="text-2xl font-bold text-gray-900 sm:text-3xl">
+                <div className="absolute bottom-5 left-5 right-5 flex items-end justify-between gap-4 text-white">
+                  <div>
+                    <h1 className="text-2xl font-bold sm:text-3xl">
                       Book {turfName}
                     </h1>
 
-                    <div className="mt-3 flex items-start gap-2 text-sm text-gray-500">
-                      <MapPin
-                        size={17}
-                        className="mt-0.5 shrink-0 text-green-600"
-                      />
-
-                      <span>
-                        {turfLocation}
-                      </span>
+                    <div className="mt-2 flex items-center gap-2 text-sm text-white/80">
+                      <MapPin size={16} />
+                      {turfLocation}
                     </div>
                   </div>
 
-                  <div className="flex shrink-0 items-center gap-1 rounded-lg bg-amber-50 px-3 py-2">
+                  <div className="flex shrink-0 items-center gap-1.5 rounded-xl bg-white/95 px-3 py-2 text-gray-900 shadow-lg backdrop-blur">
                     <Star
-                      size={16}
+                      size={15}
                       className={
                         hasRating
                           ? "fill-yellow-400 text-yellow-400"
@@ -922,57 +986,62 @@ const BookingSection = () => {
                       }
                     />
 
-                    <span className="text-sm font-semibold text-amber-700">
+                    <span className="text-sm font-bold">
                       {turfRating}
                     </span>
                   </div>
                 </div>
+              </div>
 
-                <div className="my-7 h-px bg-gray-100" />
+              <div className="p-6 sm:p-8">
+                <div>
+                  <h2 className="text-lg font-semibold text-gray-900">
+                    Booking information
+                  </h2>
 
-                <h2 className="text-lg font-semibold text-gray-900">
-                  Booking information
-                </h2>
+                  <p className="mt-2 max-w-2xl text-sm leading-6 text-gray-500">
+                    Select your preferred date
+                    and an available time slot to
+                    reserve this turf.
+                  </p>
+                </div>
 
-                <p className="mt-3 text-sm leading-7 text-gray-500">
-                  Select your preferred date and
-                  available time slot to reserve
-                  this turf.
-                </p>
+                <div className="mt-7 grid gap-3 sm:grid-cols-3">
+                  <InfoCard
+                    label="Turf size"
+                    value={turfSize}
+                  />
 
-                <div className="mt-7 grid gap-4 sm:grid-cols-3">
-                  <div className="rounded-xl bg-gray-50 p-4">
-                    <p className="text-xs text-gray-400">
-                      Turf size
-                    </p>
+                  <InfoCard
+                    label="Surface"
+                    value={turfSurface}
+                  />
 
-                    <p className="mt-1 text-sm font-semibold text-gray-900">
-                      {turfSize}
-                    </p>
-                  </div>
+                  <InfoCard
+                    label="Price"
+                    value={`৳${turfPrice.toLocaleString(
+                      "en-BD"
+                    )} / hour`}
+                  />
+                </div>
 
-                  <div className="rounded-xl bg-gray-50 p-4">
-                    <p className="text-xs text-gray-400">
-                      Surface
-                    </p>
+                <div className="mt-6 rounded-2xl border border-green-100 bg-green-50/70 p-4">
+                  <div className="flex items-start gap-3">
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white text-green-600 shadow-sm">
+                      <ShieldCheck size={18} />
+                    </div>
 
-                    <p className="mt-1 text-sm font-semibold text-gray-900">
-                      {turfSurface}
-                    </p>
-                  </div>
+                    <div>
+                      <p className="text-sm font-semibold text-gray-900">
+                        Easy booking
+                      </p>
 
-                  <div className="rounded-xl bg-gray-50 p-4">
-                    <p className="text-xs text-gray-400">
-                      Price
-                    </p>
-
-                    <p className="mt-1 text-sm font-semibold text-gray-900">
-                      ৳
-                      {turfPrice.toLocaleString(
-                        "en-BD"
-                      )}{" "}
-                      / hour
-                    </p>
+                      <p className="mt-1 text-xs leading-5 text-gray-500">
+                        Choose a date and available
+                        hour. Booked slots are
+                        automatically disabled.
+                      </p>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -980,423 +1049,483 @@ const BookingSection = () => {
           </div>
 
           {/* Booking panel */}
-          <aside className="h-fit rounded-2xl border border-gray-200 bg-white p-5 shadow-sm sm:p-6 lg:sticky lg:top-24">
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-green-50 text-green-600">
-                <CalendarDays size={20} />
+          <aside className="animate-[fadeInUp_0.7s_ease-out] lg:sticky lg:top-24 lg:h-fit">
+            <div className="overflow-hidden rounded-3xl border border-gray-200 bg-white shadow-sm">
+              {/* Panel header */}
+              <div className="border-b border-gray-100 bg-gradient-to-br from-green-50 to-white p-5 sm:p-6">
+                <div className="flex items-center justify-between gap-4">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-green-600 text-white shadow-sm shadow-green-600/20">
+                      <CalendarDays size={21} />
+                    </div>
+
+                    <div>
+                      <h2 className="font-semibold text-gray-900">
+                        Select date & time
+                      </h2>
+
+                      <p className="mt-0.5 text-xs text-gray-500">
+                        Choose your preferred slot
+                      </p>
+                    </div>
+                  </div>
+
+                  {selectedDate && (
+                    <div className="animate-[scaleIn_0.25s_ease-out] rounded-full bg-green-100 px-2.5 py-1 text-[11px] font-semibold text-green-700">
+                      {availableSlotCount} available
+                    </div>
+                  )}
+                </div>
               </div>
 
-              <div>
-                <h2 className="font-semibold text-gray-900">
-                  Select date & time
-                </h2>
+              <div className="p-5 sm:p-6">
+                {/* Date */}
+                <div>
+                  <label className="mb-2.5 block text-sm font-semibold text-gray-900">
+                    Select date
+                  </label>
 
-                <p className="text-xs text-gray-500">
-                  Choose an available slot
+                  <div className="grid grid-cols-3 gap-2">
+                    <DateSelect
+                      value={selectedDay}
+                      onChange={handleDayChange}
+                      placeholder="Day"
+                      options={dayOptions.map(
+                        (day) =>
+                          String(day).padStart(
+                            2,
+                            "0"
+                          )
+                      )}
+                    />
+
+                    <DateSelect
+                      value={selectedMonth}
+                      onChange={handleMonthChange}
+                      placeholder="Month"
+                      options={MONTHS.map(
+                        (month, index) => ({
+                          value: String(
+                            index + 1
+                          ).padStart(2, "0"),
+                          label: month,
+                        })
+                      )}
+                    />
+
+                    <DateSelect
+                      value={selectedYear}
+                      onChange={handleYearChange}
+                      placeholder="Year"
+                      options={yearOptions.map(
+                        (year) =>
+                          String(year)
+                      )}
+                    />
+                  </div>
+
+                  {!dateSelectionComplete ? (
+                    <div className="mt-3 flex items-center gap-2 rounded-xl bg-gray-50 px-3 py-2.5 text-xs text-gray-500">
+                      <CalendarDays
+                        size={15}
+                        className="shrink-0 text-gray-400"
+                      />
+                      Select day, month and year.
+                    </div>
+                  ) : selectedDate ? (
+                    <div className="animate-[slideIn_0.25s_ease-out] mt-3 flex items-center gap-2 rounded-xl border border-green-100 bg-green-50 px-3 py-2.5 text-sm font-medium text-green-700">
+                      <Check size={16} />
+                      {formatDate(selectedDate)}
+                    </div>
+                  ) : (
+                    <div className="mt-3 flex items-center gap-2 rounded-xl bg-red-50 px-3 py-2.5 text-xs text-red-600">
+                      <AlertCircle size={15} />
+                      Please select a valid date.
+                    </div>
+                  )}
+
+                  {availabilityError &&
+                    !availabilityLoading && (
+                      <p className="mt-2 text-xs text-red-500">
+                        {availabilityError}
+                      </p>
+                    )}
+                </div>
+
+                {/* Time slots */}
+                <div className="mt-7">
+                  <div className="flex items-center justify-between">
+                    <label className="text-sm font-semibold text-gray-900">
+                      Available time
+                    </label>
+
+                    {selectedDate &&
+                      !availabilityLoading &&
+                      !availabilityError && (
+                        <span className="text-[11px] font-medium text-gray-400">
+                          1 hour per slot
+                        </span>
+                      )}
+                  </div>
+
+                  {!selectedDate ? (
+                    <EmptyState
+                      icon={
+                        <CalendarDays
+                          size={18}
+                        />
+                      }
+                      text="Select a date to check available slots."
+                    />
+                  ) : availabilityLoading ? (
+                    <div className="mt-3 flex flex-col items-center justify-center rounded-2xl border border-gray-100 bg-gray-50 px-4 py-8 text-center">
+                      <div className="flex h-11 w-11 items-center justify-center rounded-full bg-green-50">
+                        <Loader2
+                          size={20}
+                          className="animate-spin text-green-600"
+                        />
+                      </div>
+
+                      <p className="mt-3 text-sm font-medium text-gray-700">
+                        Checking availability
+                      </p>
+
+                      <p className="mt-1 text-xs text-gray-400">
+                        Please wait...
+                      </p>
+                    </div>
+                  ) : availabilityError ? (
+                    <div className="mt-3 rounded-2xl border border-red-100 bg-red-50 p-4">
+                      <div className="flex items-start gap-2 text-sm text-red-600">
+                        <AlertCircle
+                          size={17}
+                          className="mt-0.5 shrink-0"
+                        />
+
+                        <span>
+                          {availabilityError}
+                        </span>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setRetryKey(
+                            (current) =>
+                              current + 1
+                          )
+                        }
+                        className="mt-3 inline-flex items-center gap-1.5 text-xs font-semibold text-red-600 transition hover:text-red-700"
+                      >
+                        <RefreshCw size={13} />
+                        Try again
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="mt-3">
+                      <div className="grid grid-cols-2 gap-2">
+                        {TIME_SLOTS.map(
+                          (slot) => {
+                            const status =
+                              getSlotStatus(
+                                slot
+                              );
+
+                            const isSelected =
+                              selectedSlot ===
+                              slot;
+
+                            const disabled =
+                              status !==
+                              "available";
+
+                            return (
+                              <button
+                                key={slot}
+                                type="button"
+                                disabled={
+                                  disabled
+                                }
+                                onClick={() =>
+                                  setSelectedSlot(
+                                    slot
+                                  )
+                                }
+                                className={`
+                                  group relative flex min-h-11 items-center justify-center gap-1.5 rounded-xl border px-2 py-2.5 text-xs font-semibold
+                                  transition-all duration-200
+                                  ${
+                                    isSelected
+                                      ? "scale-[1.02] border-green-600 bg-green-600 text-white shadow-md shadow-green-600/20"
+                                      : status ===
+                                        "booked"
+                                      ? "cursor-not-allowed border-red-100 bg-red-50 text-red-400"
+                                      : status ===
+                                        "past"
+                                      ? "cursor-not-allowed border-gray-100 bg-gray-50 text-gray-300"
+                                      : status ===
+                                        "closed"
+                                      ? "cursor-not-allowed border-gray-100 bg-gray-50 text-gray-300"
+                                      : "border-gray-200 bg-white text-gray-600 hover:-translate-y-0.5 hover:border-green-400 hover:bg-green-50 hover:text-green-700 hover:shadow-sm"
+                                  }
+                                `}
+                              >
+                                {isSelected ? (
+                                  <Check size={14} />
+                                ) : status ===
+                                  "booked" ? (
+                                  <span className="text-[10px]">
+                                    Booked
+                                  </span>
+                                ) : status ===
+                                  "closed" ? (
+                                  <span className="text-[10px]">
+                                    Closed
+                                  </span>
+                                ) : status ===
+                                  "past" ? (
+                                  <span className="text-[10px]">
+                                    Past
+                                  </span>
+                                ) : (
+                                  <>
+                                    <Clock
+                                      size={13}
+                                    />
+                                    {slot}
+                                  </>
+                                )}
+                              </button>
+                            );
+                          }
+                        )}
+                      </div>
+
+                      <div className="mt-4 flex flex-wrap gap-x-4 gap-y-2 border-t border-gray-100 pt-4">
+                        <Legend
+                          dot="bg-green-500"
+                          label="Available"
+                        />
+
+                        <Legend
+                          dot="bg-red-400"
+                          label="Booked"
+                        />
+
+                        {isToday && (
+                          <Legend
+                            dot="bg-gray-300"
+                            label="Past"
+                          />
+                        )}
+
+                        <Legend
+                          dot="bg-gray-200"
+                          label="Closed"
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Summary */}
+                {bookingReady && (
+                  <div className="animate-[fadeInUp_0.3s_ease-out] mt-6 overflow-hidden rounded-2xl border border-green-100 bg-green-50/70">
+                    <div className="flex items-center justify-between border-b border-green-100 px-4 py-3">
+                      <h3 className="text-sm font-semibold text-gray-900">
+                        Booking summary
+                      </h3>
+
+                      <span className="rounded-full bg-green-100 px-2 py-1 text-[10px] font-semibold text-green-700">
+                        Selected
+                      </span>
+                    </div>
+
+                    <div className="space-y-3 p-4">
+                      <SummaryRow
+                        label="Date"
+                        value={formatDate(
+                          selectedDate
+                        )}
+                      />
+
+                      <SummaryRow
+                        label="Time"
+                        value={`${selectedSlot} - ${selectedEndTime}`}
+                        icon={<Clock size={14} />}
+                      />
+
+                      <div className="border-t border-green-100 pt-3">
+                        <div className="flex items-end justify-between gap-4">
+                          <div>
+                            <p className="text-xs text-gray-500">
+                              Total price
+                            </p>
+
+                            <p className="mt-1 text-2xl font-bold text-gray-900">
+                              ৳
+                              {turfPrice.toLocaleString(
+                                "en-BD"
+                              )}
+                            </p>
+                          </div>
+
+                          <span className="text-xs text-gray-500">
+                            1 hour
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* CTA */}
+                {bookingReady ? (
+                  <Link
+                    to={bookingUrl}
+                    className="group mt-5 inline-flex h-13 w-full items-center justify-center gap-2 rounded-xl bg-green-600 px-5 py-3.5 text-sm font-semibold text-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:bg-green-700 hover:shadow-lg hover:shadow-green-600/20 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2"
+                  >
+                    Continue to booking
+                    <ArrowRight
+                      size={17}
+                      className="transition-transform group-hover:translate-x-1"
+                    />
+                  </Link>
+                ) : (
+                  <button
+                    type="button"
+                    disabled
+                    className="mt-5 inline-flex h-13 w-full cursor-not-allowed items-center justify-center gap-2 rounded-xl bg-gray-100 px-5 py-3.5 text-sm font-semibold text-gray-400"
+                  >
+                    Select date and time
+                    <ArrowRight size={17} />
+                  </button>
+                )}
+
+                <p className="mt-4 text-center text-[11px] leading-5 text-gray-400">
+                  Booked slots are automatically
+                  disabled for your selected date.
                 </p>
               </div>
             </div>
-
-            {/* Date */}
-            <div className="mt-6">
-              <label className="mb-2 block text-sm font-medium text-gray-900">
-                Select date
-              </label>
-
-              <div className="grid grid-cols-3 gap-2">
-                {/* Day */}
-                <div className="relative">
-                  <select
-                    value={selectedDay}
-                    onChange={handleDayChange}
-                    className={`h-12 w-full appearance-none rounded-xl border bg-white px-3 pr-8 text-sm outline-none transition focus:border-green-500 focus:ring-4 focus:ring-green-500/10 ${
-                      selectedDay
-                        ? "border-gray-200 text-gray-700"
-                        : "border-gray-200 text-gray-400"
-                    }`}
-                  >
-                    <option value="">
-                      Day
-                    </option>
-
-                    {dayOptions.map((day) => {
-                      const value = String(
-                        day
-                      ).padStart(2, "0");
-
-                      return (
-                        <option
-                          key={value}
-                          value={value}
-                        >
-                          {value}
-                        </option>
-                      );
-                    })}
-                  </select>
-
-                  <ChevronDown
-                    size={16}
-                    className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400"
-                  />
-                </div>
-
-                {/* Month */}
-                <div className="relative">
-                  <select
-                    value={selectedMonth}
-                    onChange={handleMonthChange}
-                    className={`h-12 w-full appearance-none rounded-xl border bg-white px-3 pr-8 text-sm outline-none transition focus:border-green-500 focus:ring-4 focus:ring-green-500/10 ${
-                      selectedMonth
-                        ? "border-gray-200 text-gray-700"
-                        : "border-gray-200 text-gray-400"
-                    }`}
-                  >
-                    <option value="">
-                      Month
-                    </option>
-
-                    {MONTHS.map(
-                      (month, index) => {
-                        const value =
-                          String(index + 1).padStart(
-                            2,
-                            "0"
-                          );
-
-                        return (
-                          <option
-                            key={value}
-                            value={value}
-                          >
-                            {month}
-                          </option>
-                        );
-                      }
-                    )}
-                  </select>
-
-                  <ChevronDown
-                    size={16}
-                    className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400"
-                  />
-                </div>
-
-                {/* Year */}
-                <div className="relative">
-                  <select
-                    value={selectedYear}
-                    onChange={handleYearChange}
-                    className={`h-12 w-full appearance-none rounded-xl border bg-white px-3 pr-8 text-sm outline-none transition focus:border-green-500 focus:ring-4 focus:ring-green-500/10 ${
-                      selectedYear
-                        ? "border-gray-200 text-gray-700"
-                        : "border-gray-200 text-gray-400"
-                    }`}
-                  >
-                    <option value="">
-                      Year
-                    </option>
-
-                    {yearOptions.map(
-                      (year) => (
-                        <option
-                          key={year}
-                          value={String(year)}
-                        >
-                          {year}
-                        </option>
-                      )
-                    )}
-                  </select>
-
-                  <ChevronDown
-                    size={16}
-                    className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400"
-                  />
-                </div>
-              </div>
-
-              {/* Date status */}
-              {!dateSelectionComplete ? (
-                <div className="mt-3 flex items-start gap-2 rounded-xl bg-gray-50 px-3 py-2.5 text-xs leading-5 text-gray-500">
-                  <CalendarDays
-                    size={15}
-                    className="mt-0.5 shrink-0 text-gray-400"
-                  />
-
-                  <span>
-                    Select day, month and year.
-                  </span>
-                </div>
-              ) : selectedDate ? (
-                <div className="mt-3 flex items-center gap-2 rounded-xl bg-green-50 px-3 py-2.5 text-sm font-medium text-green-700">
-                  <CalendarDays size={16} />
-                  {formatDate(selectedDate)}
-                </div>
-              ) : (
-                <div className="mt-3 flex items-start gap-2 rounded-xl bg-red-50 px-3 py-2.5 text-xs leading-5 text-red-600">
-                  <AlertCircle
-                    size={15}
-                    className="mt-0.5 shrink-0"
-                  />
-
-                  <span>
-                    Please select a valid date.
-                  </span>
-                </div>
-              )}
-
-              {availabilityError &&
-                !availabilityLoading && (
-                  <p className="mt-2 text-xs text-red-500">
-                    {availabilityError}
-                  </p>
-                )}
-            </div>
-
-            {/* Time slots */}
-            <div className="mt-6">
-              <div className="flex items-center justify-between gap-3">
-                <label className="text-sm font-medium text-gray-900">
-                  Available time slots
-                </label>
-
-                {selectedDate &&
-                  !availabilityLoading &&
-                  !availabilityError && (
-                    <span className="text-xs text-green-600">
-                      Select one
-                    </span>
-                  )}
-              </div>
-
-              {!selectedDate ? (
-                <div className="mt-3 flex items-start gap-2 rounded-xl bg-gray-50 px-4 py-4 text-sm text-gray-500">
-                  <AlertCircle
-                    size={17}
-                    className="mt-0.5 shrink-0"
-                  />
-
-                  <span>
-                    Select day, month and year to
-                    check available slots.
-                  </span>
-                </div>
-              ) : availabilityLoading ? (
-                <div className="mt-3 flex items-center justify-center gap-2 rounded-xl bg-gray-50 px-4 py-6 text-sm text-gray-500">
-                  <Loader2
-                    size={18}
-                    className="animate-spin text-green-600"
-                  />
-
-                  Checking availability...
-                </div>
-              ) : availabilityError ? (
-                <div className="mt-3 rounded-xl border border-red-100 bg-red-50 p-4">
-                  <div className="flex items-start gap-2 text-sm text-red-600">
-                    <AlertCircle
-                      size={17}
-                      className="mt-0.5 shrink-0"
-                    />
-
-                    <span>
-                      {availabilityError}
-                    </span>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setRetryKey(
-                        (current) =>
-                          current + 1
-                      )
-                    }
-                    className="mt-3 inline-flex items-center gap-1.5 text-xs font-semibold text-red-600 hover:text-red-700"
-                  >
-                    <RefreshCw size={13} />
-                    Try again
-                  </button>
-                </div>
-              ) : (
-                <>
-                  <div className="mt-3 grid grid-cols-2 gap-2">
-                    {TIME_SLOTS.map((slot) => {
-                      const status =
-                        getSlotStatus(slot);
-
-                      const isSelected =
-                        selectedSlot === slot;
-
-                      const disabled =
-                        status !== "available";
-
-                      return (
-                        <button
-                          key={slot}
-                          type="button"
-                          disabled={disabled}
-                          onClick={() =>
-                            setSelectedSlot(slot)
-                          }
-                          className={`relative flex items-center justify-center gap-1.5 rounded-lg border px-3 py-3 text-xs font-medium transition ${
-                            isSelected
-                              ? "border-green-600 bg-green-600 text-white"
-                              : status ===
-                                "booked"
-                              ? "cursor-not-allowed border-red-100 bg-red-50 text-red-400"
-                              : status ===
-                                "past"
-                              ? "cursor-not-allowed border-gray-100 bg-gray-50 text-gray-300"
-                              : status ===
-                                "closed"
-                              ? "cursor-not-allowed border-gray-100 bg-gray-50 text-gray-300"
-                              : "border-gray-200 bg-white text-gray-600 hover:border-green-400 hover:bg-green-50 hover:text-green-700"
-                          }`}
-                        >
-                          {isSelected ? (
-                            <Check size={14} />
-                          ) : status ===
-                            "booked" ? (
-                            <span className="text-[10px]">
-                              Booked
-                            </span>
-                          ) : status ===
-                            "closed" ? (
-                            <span className="text-[10px]">
-                              Closed
-                            </span>
-                          ) : status ===
-                            "past" ? (
-                            <span className="text-[10px]">
-                              Past
-                            </span>
-                          ) : (
-                            <Clock size={13} />
-                          )}
-
-                          {status !==
-                            "booked" &&
-                            status !==
-                              "closed" &&
-                            status !==
-                              "past" &&
-                            slot}
-                        </button>
-                      );
-                    })}
-                  </div>
-
-                  <div className="mt-4 flex flex-wrap gap-x-4 gap-y-2 text-[11px] text-gray-400">
-                    <span className="flex items-center gap-1.5">
-                      <span className="h-2 w-2 rounded-full bg-green-500" />
-                      Available
-                    </span>
-
-                    <span className="flex items-center gap-1.5">
-                      <span className="h-2 w-2 rounded-full bg-red-400" />
-                      Booked
-                    </span>
-
-                    {isToday && (
-                      <span className="flex items-center gap-1.5">
-                        <span className="h-2 w-2 rounded-full bg-gray-300" />
-                        Past
-                      </span>
-                    )}
-
-                    <span className="flex items-center gap-1.5">
-                      <span className="h-2 w-2 rounded-full bg-gray-200" />
-                      Closed
-                    </span>
-                  </div>
-                </>
-              )}
-            </div>
-
-            {/* Booking summary */}
-            {bookingReady && (
-              <div className="mt-6 rounded-xl bg-gray-50 p-4">
-                <h3 className="text-sm font-semibold text-gray-900">
-                  Booking summary
-                </h3>
-
-                <div className="mt-4 space-y-3 text-sm">
-                  <div className="flex justify-between gap-4">
-                    <span className="text-gray-500">
-                      Date
-                    </span>
-
-                    <span className="font-medium text-gray-900">
-                      {formatDate(selectedDate)}
-                    </span>
-                  </div>
-
-                  <div className="flex justify-between gap-4">
-                    <span className="flex items-center gap-1.5 text-gray-500">
-                      <Clock size={15} />
-                      Time
-                    </span>
-
-                    <span className="text-right font-medium text-gray-900">
-                      {selectedSlot} -{" "}
-                      {selectedEndTime}
-                    </span>
-                  </div>
-
-                  <div className="border-t border-gray-200 pt-3">
-                    <div className="flex items-end justify-between">
-                      <div>
-                        <p className="text-xs text-gray-500">
-                          Turf price
-                        </p>
-
-                        <p className="mt-1 text-xl font-bold text-gray-900">
-                          ৳
-                          {turfPrice.toLocaleString(
-                            "en-BD"
-                          )}
-                        </p>
-                      </div>
-
-                      <span className="text-xs text-gray-500">
-                        1 hour
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Continue */}
-            {bookingReady ? (
-              <Link
-                to={bookingUrl}
-                className="mt-6 inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-green-600 px-5 text-sm font-semibold text-white transition hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2"
-              >
-                Continue to booking
-                <ArrowRight size={17} />
-              </Link>
-            ) : (
-              <button
-                type="button"
-                disabled
-                className="mt-6 inline-flex h-12 w-full cursor-not-allowed items-center justify-center gap-2 rounded-xl bg-gray-200 px-5 text-sm font-semibold text-gray-400"
-              >
-                Select date and time
-                <ArrowRight size={17} />
-              </button>
-            )}
-
-            <p className="mt-4 text-center text-xs leading-5 text-gray-400">
-              Booked slots are automatically
-              disabled for the selected date.
-            </p>
           </aside>
         </div>
       </section>
     </main>
   );
 };
+
+const DateSelect = ({
+  value,
+  onChange,
+  placeholder,
+  options,
+}) => {
+  const normalizedOptions = options.map(
+    (option) => {
+      if (typeof option === "string") {
+        return {
+          value: option,
+          label: option,
+        };
+      }
+
+      return option;
+    }
+  );
+
+  return (
+    <div className="relative">
+      <select
+        value={value}
+        onChange={onChange}
+        className={`h-12 w-full appearance-none rounded-xl border bg-white px-3 pr-8 text-sm outline-none transition-all duration-200 focus:border-green-500 focus:ring-4 focus:ring-green-500/10 ${
+          value
+            ? "border-gray-200 text-gray-700"
+            : "border-gray-200 text-gray-400"
+        }`}
+      >
+        <option value="">
+          {placeholder}
+        </option>
+
+        {normalizedOptions.map(
+          (option) => (
+            <option
+              key={option.value}
+              value={option.value}
+            >
+              {option.label}
+            </option>
+          )
+        )}
+      </select>
+
+      <ChevronDown
+        size={15}
+        className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400"
+      />
+    </div>
+  );
+};
+
+const InfoCard = ({
+  label,
+  value,
+}) => (
+  <div className="group rounded-2xl border border-gray-100 bg-gray-50 p-4 transition-all duration-200 hover:-translate-y-0.5 hover:border-green-100 hover:bg-green-50">
+    <p className="text-xs text-gray-400">
+      {label}
+    </p>
+
+    <p className="mt-1.5 text-sm font-semibold text-gray-900">
+      {value}
+    </p>
+  </div>
+);
+
+const EmptyState = ({
+  icon,
+  text,
+}) => (
+  <div className="mt-3 flex items-start gap-3 rounded-2xl border border-gray-100 bg-gray-50 px-4 py-4 text-sm text-gray-500">
+    <div className="mt-0.5 text-gray-400">
+      {icon}
+    </div>
+
+    <span className="leading-5">
+      {text}
+    </span>
+  </div>
+);
+
+const Legend = ({
+  dot,
+  label,
+}) => (
+  <span className="flex items-center gap-1.5 text-[11px] text-gray-400">
+    <span
+      className={`h-2 w-2 rounded-full ${dot}`}
+    />
+    {label}
+  </span>
+);
+
+const SummaryRow = ({
+  label,
+  value,
+  icon,
+}) => (
+  <div className="flex items-center justify-between gap-4 text-sm">
+    <span className="flex items-center gap-1.5 text-gray-500">
+      {icon}
+      {label}
+    </span>
+
+    <span className="text-right font-medium text-gray-900">
+      {value}
+    </span>
+  </div>
+);
 
 export default BookingSection;

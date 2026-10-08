@@ -11,68 +11,63 @@ import { auth } from "../firebase/firebase.config";
 
 export const AuthContext = createContext(null);
 
-// =====================================================
-// API CONFIG
-// =====================================================
+const API_URL = (
+  import.meta.env.VITE_API_URL || "http://localhost:3000"
+).replace(/\/$/, "");
 
-const API_URL =
-  import.meta.env.VITE_API_URL || "http://localhost:3000";
+const USER_STORAGE_KEY = "khelaro-user";
+const UID_STORAGE_KEY = "khelaro-uid";
 
-// =====================================================
-// AUTH PROVIDER
-// =====================================================
+const normalizeEmail = (email = "") =>
+  String(email).trim().toLowerCase();
+
+const normalizeRole = (role = "user") =>
+  String(role).trim().toLowerCase() || "user";
+
+const saveUser = (user) => {
+  localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(user));
+
+  if (user?.uid) {
+    localStorage.setItem(UID_STORAGE_KEY, user.uid);
+  }
+};
+
+const clearStoredUser = () => {
+  localStorage.removeItem(USER_STORAGE_KEY);
+  localStorage.removeItem(UID_STORAGE_KEY);
+};
 
 const AuthProvider = ({ children }) => {
   const [currentUser, setCurrentUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // ===================================================
-  // GET USER PROFILE FROM MONGODB
-  // ===================================================
-
   const getMongoUser = async (email) => {
-    if (!email) {
-      throw new Error("Firebase user email not found.");
+    const normalizedEmail = normalizeEmail(email);
+
+    if (!normalizedEmail) {
+      return null;
     }
 
-    const normalizedEmail = email.trim().toLowerCase();
-
-    const url = `${API_URL}/users/${encodeURIComponent(
-      normalizedEmail
-    )}`;
-
     try {
-      const response = await fetch(url, {
-        method: "GET",
-        headers: {
-          Accept: "application/json",
-        },
-      });
+      const response = await fetch(
+        `${API_URL}/users/${encodeURIComponent(normalizedEmail)}`,
+        {
+          method: "GET",
+          headers: {
+            Accept: "application/json",
+          },
+        }
+      );
 
-      let data = null;
-
-      try {
-        data = await response.json();
-      } catch {
-        data = null;
-      }
-
-      // -----------------------------------------------
-      // USER NOT FOUND
-      // -----------------------------------------------
+      const data = await response.json().catch(() => null);
 
       if (response.status === 404) {
         console.warn(
           "MongoDB user profile not found:",
           normalizedEmail
         );
-
         return null;
       }
-
-      // -----------------------------------------------
-      // OTHER SERVER ERROR
-      // -----------------------------------------------
 
       if (!response.ok) {
         console.error(
@@ -80,13 +75,8 @@ const AuthProvider = ({ children }) => {
           response.status,
           data
         );
-
         return null;
       }
-
-      // -----------------------------------------------
-      // BACKEND RESPONSE
-      // -----------------------------------------------
 
       const mongoUser = data?.user || data;
 
@@ -94,13 +84,7 @@ const AuthProvider = ({ children }) => {
         return null;
       }
 
-      // -----------------------------------------------
-      // VERIFY EMAIL
-      // -----------------------------------------------
-
-      const databaseEmail = mongoUser.email
-        .trim()
-        .toLowerCase();
+      const databaseEmail = normalizeEmail(mongoUser.email);
 
       if (databaseEmail !== normalizedEmail) {
         console.error("Email mismatch:", {
@@ -113,146 +97,78 @@ const AuthProvider = ({ children }) => {
 
       return mongoUser;
     } catch (error) {
-      console.error(
-        "MongoDB profile fetch failed:",
-        error
-      );
-
+      console.error("MongoDB profile fetch failed:", error);
       return null;
     }
   };
 
-  // ===================================================
-  // BUILD FINAL USER
-  // ===================================================
+  const createFinalUser = (firebaseUser, mongoUser = null) => {
+    const email = normalizeEmail(firebaseUser?.email);
+
+    if (!firebaseUser || !email) {
+      return null;
+    }
+
+    return {
+      ...(mongoUser || {}),
+      uid: firebaseUser.uid,
+      email,
+      displayName:
+        firebaseUser.displayName ||
+        mongoUser?.name ||
+        "",
+      role: normalizeRole(mongoUser?.role),
+    };
+  };
+
+  const setAndPersistUser = (user) => {
+    if (!user) {
+      setCurrentUser(null);
+      clearStoredUser();
+      return null;
+    }
+
+    setCurrentUser(user);
+    saveUser(user);
+
+    return user;
+  };
 
   const buildCurrentUser = async (firebaseUser) => {
     if (!firebaseUser) {
-      setCurrentUser(null);
-
-      localStorage.removeItem("khelaro-user");
-      localStorage.removeItem("khelaro-uid");
-
+      setAndPersistUser(null);
       return null;
     }
 
-    const firebaseEmail = firebaseUser.email
-      ?.trim()
-      .toLowerCase();
+    const mongoUser = await getMongoUser(
+      firebaseUser.email
+    );
 
-    // -----------------------------------------------
-    // GET MONGODB PROFILE
-    // -----------------------------------------------
+    const finalUser = createFinalUser(
+      firebaseUser,
+      mongoUser
+    );
 
-    const mongoUser = await getMongoUser(firebaseEmail);
-
-    // -----------------------------------------------
-    // IF MONGODB PROFILE EXISTS
-    // -----------------------------------------------
-
-    if (mongoUser) {
-      const role = String(
-        mongoUser.role || "user"
-      )
-        .trim()
-        .toLowerCase();
-
-      const finalUser = {
-        ...mongoUser,
-
-        // Firebase data
-        uid: firebaseUser.uid,
-        email: firebaseEmail,
-        displayName:
-          firebaseUser.displayName ||
-          mongoUser.name ||
-          "",
-
-        // MongoDB role
-        role,
-      };
-
-      // ---------------------------------------------
-      // SAVE LOCAL USER
-      // ---------------------------------------------
-
-      localStorage.setItem(
-        "khelaro-user",
-        JSON.stringify(finalUser)
+    if (!mongoUser) {
+      console.warn(
+        "Firebase user exists but MongoDB profile was not found."
       );
-
-      localStorage.setItem(
-        "khelaro-uid",
-        firebaseUser.uid
-      );
-
-      setCurrentUser(finalUser);
-
-      console.log(
-        "Khelaro user restored:",
-        finalUser
-      );
-
-      return finalUser;
+    } else {
+      console.log("Khelaro user restored:", finalUser);
     }
 
-    // =================================================
-    // FALLBACK
-    // =================================================
-    //
-    // Firebase account exists but MongoDB profile
-    // does not exist.
-    //
-    // We DON'T give admin/owner role here.
-    // Default role is user.
-    // =================================================
-
-    const fallbackUser = {
-      uid: firebaseUser.uid,
-      email: firebaseEmail,
-      displayName:
-        firebaseUser.displayName || "",
-      role: "user",
-    };
-
-    setCurrentUser(fallbackUser);
-
-    localStorage.setItem(
-      "khelaro-user",
-      JSON.stringify(fallbackUser)
-    );
-
-    localStorage.setItem(
-      "khelaro-uid",
-      firebaseUser.uid
-    );
-
-    console.warn(
-      "Firebase user exists but MongoDB profile was not found."
-    );
-
-    return fallbackUser;
+    return setAndPersistUser(finalUser);
   };
 
-  // ===================================================
-  // REGISTER
-  // ===================================================
-
-  const register = async (
-    name,
-    email,
-    password
-  ) => {
+  const register = async (name, email, password) => {
     try {
       setLoading(true);
 
-      const normalizedEmail = email
-        .trim()
-        .toLowerCase();
+      const normalizedEmail = normalizeEmail(email);
 
-      // -----------------------------------------------
-      // CREATE FIREBASE USER
-      // -----------------------------------------------
+      if (!normalizedEmail) {
+        throw new Error("Email is required.");
+      }
 
       const result =
         await createUserWithEmailAndPassword(
@@ -261,30 +177,9 @@ const AuthProvider = ({ children }) => {
           password
         );
 
-      // -----------------------------------------------
-      // UPDATE FIREBASE PROFILE
-      // -----------------------------------------------
-
       await updateProfile(result.user, {
-        displayName: name,
+        displayName: name.trim(),
       });
-
-      // -----------------------------------------------
-      // IMPORTANT
-      // -----------------------------------------------
-      //
-      // MongoDB registration should create the user
-      // profile with:
-      //
-      // role: "user"
-      //
-      // or:
-      //
-      // role: "owner"
-      //
-      // depending on your Register page.
-      //
-      // -----------------------------------------------
 
       const mongoUser = await getMongoUser(
         normalizedEmail
@@ -292,66 +187,41 @@ const AuthProvider = ({ children }) => {
 
       const finalUser = {
         ...(mongoUser || {}),
-
         uid: result.user.uid,
-        name:
-          mongoUser?.name ||
-          name,
+        name: mongoUser?.name || name.trim(),
         email: normalizedEmail,
-        displayName: name,
-        role:
-          mongoUser?.role ||
-          "user",
+        displayName: name.trim(),
+        role: normalizeRole(mongoUser?.role),
       };
 
-      setCurrentUser(finalUser);
+      setAndPersistUser(finalUser);
 
-      localStorage.setItem(
-        "khelaro-user",
-        JSON.stringify(finalUser)
-      );
-
-      localStorage.setItem(
-        "khelaro-uid",
-        result.user.uid
-      );
-
-      toast.success(
-        "Account created successfully!"
-      );
+      toast.success("Account created successfully!");
 
       return result.user;
     } catch (error) {
-      console.error(
-        "Registration error:",
-        error
-      );
+      console.error("Registration error:", error);
 
-      if (
-        error.code ===
-        "auth/email-already-in-use"
-      ) {
-        toast.error(
-          "This email is already registered."
-        );
-      } else if (
-        error.code ===
-        "auth/weak-password"
-      ) {
-        toast.error(
-          "Password should be at least 6 characters."
-        );
-      } else if (
-        error.code ===
-        "auth/invalid-email"
-      ) {
-        toast.error(
-          "Please enter a valid email address."
-        );
-      } else {
-        toast.error(
-          "Registration failed. Please try again."
-        );
+      switch (error.code) {
+        case "auth/email-already-in-use":
+          toast.error("This email is already registered.");
+          break;
+
+        case "auth/weak-password":
+          toast.error(
+            "Password should be at least 6 characters."
+          );
+          break;
+
+        case "auth/invalid-email":
+          toast.error("Please enter a valid email address.");
+          break;
+
+        default:
+          toast.error(
+            error.message ||
+              "Registration failed. Please try again."
+          );
       }
 
       throw error;
@@ -360,24 +230,11 @@ const AuthProvider = ({ children }) => {
     }
   };
 
-  // ===================================================
-  // LOGIN
-  // ===================================================
-
-  const login = async (
-    email,
-    password
-  ) => {
+  const login = async (email, password) => {
     try {
       setLoading(true);
 
-      const normalizedEmail = email
-        .trim()
-        .toLowerCase();
-
-      // -----------------------------------------------
-      // FIREBASE LOGIN
-      // -----------------------------------------------
+      const normalizedEmail = normalizeEmail(email);
 
       const result =
         await signInWithEmailAndPassword(
@@ -386,119 +243,31 @@ const AuthProvider = ({ children }) => {
           password
         );
 
-      // -----------------------------------------------
-      // GET MONGODB USER
-      // -----------------------------------------------
+      await buildCurrentUser(result.user);
 
-      const mongoUser =
-        await getMongoUser(
-          result.user.email
-        );
-
-      // -----------------------------------------------
-      // IMPORTANT
-      // -----------------------------------------------
-      //
-      // Login.jsx will also validate the profile.
-      // Here we simply restore the correct role.
-      // -----------------------------------------------
-
-      if (mongoUser) {
-        const role = String(
-          mongoUser.role || "user"
-        )
-          .trim()
-          .toLowerCase();
-
-        const finalUser = {
-          ...mongoUser,
-
-          uid: result.user.uid,
-          email:
-            result.user.email
-              ?.trim()
-              .toLowerCase(),
-
-          displayName:
-            result.user.displayName ||
-            mongoUser.name ||
-            "",
-
-          role,
-        };
-
-        setCurrentUser(finalUser);
-
-        localStorage.setItem(
-          "khelaro-user",
-          JSON.stringify(finalUser)
-        );
-
-        localStorage.setItem(
-          "khelaro-uid",
-          result.user.uid
-        );
-      } else {
-        // Firebase account exists,
-        // but MongoDB profile doesn't exist.
-
-        const fallbackUser = {
-          uid: result.user.uid,
-          email:
-            result.user.email
-              ?.trim()
-              .toLowerCase(),
-          displayName:
-            result.user.displayName || "",
-          role: "user",
-        };
-
-        setCurrentUser(fallbackUser);
-
-        localStorage.setItem(
-          "khelaro-user",
-          JSON.stringify(fallbackUser)
-        );
-
-        localStorage.setItem(
-          "khelaro-uid",
-          result.user.uid
-        );
-      }
-
-      toast.success(
-        "Login successful!"
-      );
+      toast.success("Login successful!");
 
       return result.user;
     } catch (error) {
-      console.error(
-        "Login error:",
-        error
-      );
+      console.error("Login error:", error);
 
-      if (
-        error.code ===
-          "auth/invalid-credential" ||
-        error.code ===
-          "auth/wrong-password" ||
-        error.code ===
-          "auth/user-not-found"
-      ) {
-        toast.error(
-          "Invalid email or password."
-        );
-      } else if (
-        error.code ===
-        "auth/too-many-requests"
-      ) {
-        toast.error(
-          "Too many attempts. Please try again later."
-        );
-      } else {
-        toast.error(
-          "Login failed. Please try again."
-        );
+      switch (error.code) {
+        case "auth/invalid-credential":
+        case "auth/wrong-password":
+        case "auth/user-not-found":
+          toast.error("Invalid email or password.");
+          break;
+
+        case "auth/too-many-requests":
+          toast.error(
+            "Too many attempts. Please try again later."
+          );
+          break;
+
+        default:
+          toast.error(
+            "Login failed. Please try again."
+          );
       }
 
       throw error;
@@ -507,32 +276,15 @@ const AuthProvider = ({ children }) => {
     }
   };
 
-  // ===================================================
-  // LOGOUT
-  // ===================================================
-
   const logout = async () => {
     try {
       await signOut(auth);
 
-      setCurrentUser(null);
+      setAndPersistUser(null);
 
-      localStorage.removeItem(
-        "khelaro-user"
-      );
-
-      localStorage.removeItem(
-        "khelaro-uid"
-      );
-
-      toast.success(
-        "Logged out successfully."
-      );
+      toast.success("Logged out successfully.");
     } catch (error) {
-      console.error(
-        "Logout error:",
-        error
-      );
+      console.error("Logout error:", error);
 
       toast.error(
         "Logout failed. Please try again."
@@ -542,68 +294,38 @@ const AuthProvider = ({ children }) => {
     }
   };
 
-  // ===================================================
-  // FIREBASE AUTH STATE LISTENER
-  // ===================================================
-
   useEffect(() => {
-    const unsubscribe =
-      onAuthStateChanged(
-        auth,
-        async (firebaseUser) => {
-          try {
-            setLoading(true);
+    const unsubscribe = onAuthStateChanged(
+      auth,
+      async (firebaseUser) => {
+        try {
+          setLoading(true);
 
-            if (!firebaseUser) {
-              setCurrentUser(null);
-
-              localStorage.removeItem(
-                "khelaro-user"
-              );
-
-              localStorage.removeItem(
-                "khelaro-uid"
-              );
-
-              return;
-            }
-
-            // -----------------------------------------
-            // IMPORTANT
-            // -----------------------------------------
-            //
-            // Every time browser reloads,
-            // Firebase restores the user.
-            //
-            // Then we ALSO fetch MongoDB profile
-            // to restore the correct role.
-            //
-            // -----------------------------------------
-
-            await buildCurrentUser(
-              firebaseUser
-            );
-          } catch (error) {
-            console.error(
-              "Auth state restore error:",
-              error
-            );
-
-            setCurrentUser(
-              firebaseUser
-            );
-          } finally {
-            setLoading(false);
+          if (!firebaseUser) {
+            setAndPersistUser(null);
+            return;
           }
+
+          await buildCurrentUser(firebaseUser);
+        } catch (error) {
+          console.error(
+            "Auth state restore error:",
+            error
+          );
+
+          const fallbackUser = createFinalUser(
+            firebaseUser
+          );
+
+          setAndPersistUser(fallbackUser);
+        } finally {
+          setLoading(false);
         }
-      );
+      }
+    );
 
-    return () => unsubscribe();
+    return unsubscribe;
   }, []);
-
-  // ===================================================
-  // AUTH CONTEXT
-  // ===================================================
 
   const authInfo = {
     currentUser,
@@ -614,9 +336,7 @@ const AuthProvider = ({ children }) => {
   };
 
   return (
-    <AuthContext.Provider
-      value={authInfo}
-    >
+    <AuthContext.Provider value={authInfo}>
       {children}
     </AuthContext.Provider>
   );
